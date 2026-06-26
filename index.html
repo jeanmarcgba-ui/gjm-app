@@ -51,6 +51,12 @@ window.jbSave=function(data){
   clearTimeout(_sbTimer);
   _sbTimer=setTimeout(function(){_sbDoSave(data);},1500);
 };
+window._sbDoSave=function(data){
+  // Annuler le debounce en cours et sauvegarder immédiatement
+  if(window._sbTimer)clearTimeout(window._sbTimer);
+  _sbSaving=false; // forcer le déblocage
+  _sbDoSave(data);
+};
 function _sbDoSave(data){
   if(_sbSaving){_sbDirty=true;return;}
   _sbSaving=true;
@@ -134,13 +140,14 @@ window.jbStartSync=function(){
         if(typeof updHomeNf==="function")updHomeNf();
         if(typeof rCcont==="function")rCcont();
         if(typeof rEvlst==="function")rEvlst();
+        if(window._updBadges)window._updBadges();
         _jbSetStatus("&#128260; Mis a jour","#d4edda","#155724");
-        setTimeout(function(){_jbSetStatus("&#128994; Sync","#d4edda","#155724");},3000);
+        setTimeout(function(){_jbSetStatus("&#128994; Sync","#d4edda","#155724");},2000);
       }
     }).catch(function(){
       _jbSetStatus("&#128245; Hors ligne","#f8d7da","#721c24");
     });
-  },5000);
+  },3000);
 };
 </script>
 
@@ -422,8 +429,8 @@ tr:hover td{background:var(--gc);}
       <div class="ni" data-pg="prf"><span class="ic">&#128100;</span><span>Mon Profil</span></div>
       <div class="sbt">Communication</div>
       <div class="ni" data-pg="news"><span class="ic">&#128240;</span><span>Actualites</span></div>
-      <div class="ni" data-pg="chat"><span class="ic">&#128172;</span><span>Messages</span></div>
-      <div class="ni" data-pg="ntf"><span class="ic">&#128276;</span><span>Notifications</span></div>
+      <div class="ni" data-pg="chat"><span class="ic">&#128172;</span><span>Messages</span><span id="msg-badge" style="background:var(--er);color:#fff;border-radius:50%;width:18px;height:18px;font-size:.65rem;display:none;align-items:center;justify-content:center;margin-left:auto;font-weight:700">0</span></div>
+      <div class="ni" data-pg="ntf"><span class="ic">&#128276;</span><span>Notifications</span><span id="nf-badge" style="background:var(--er);color:#fff;border-radius:50%;width:18px;height:18px;font-size:.65rem;display:none;align-items:center;justify-content:center;margin-left:auto;font-weight:700">0</span></div>
       <div class="sbt">Evenements</div>
       <div class="ni" data-pg="cal"><span class="ic">&#128197;</span><span>Calendrier</span></div>
       <div class="ni" data-pg="gal"><span class="ic">&#128444;</span><span>Galerie</span></div>
@@ -460,6 +467,16 @@ tr:hover td{background:var(--gc);}
           <div class="sc"><div class="si sv">&#128197;</div><div><div class="sval" id="ste">0</div><div class="slbl">Evenements</div></div></div>
           <div class="sc"><div class="si sr">&#127873;</div><div><div class="sval" id="std">0 F</div><div class="slbl">Dons</div></div></div>
         </div>
+        <!-- Bouton activer notifications -->
+        <div id="notif-ask-panel" style="margin-bottom:16px;background:#fff8e1;border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px;border:1.5px solid #f0c040">
+          <span style="font-size:1.5rem">🔔</span>
+          <div style="flex:1">
+            <div style="font-weight:700;color:var(--b);font-size:.88rem">Activer les notifications</div>
+            <div style="font-size:.75rem;color:#778">Recevez des alertes meme quand l'app est fermee</div>
+          </div>
+          <button onclick="activerNotifs()" class="btn bp bsm" style="flex-shrink:0">Activer</button>
+        </div>
+
         <!-- Notifications sur la page d'accueil -->
         <div id="home-nf-panel" style="margin-bottom:20px;display:none;background:#1a3a6e;border-radius:16px;padding:18px 20px">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
@@ -1709,6 +1726,8 @@ q("pubnbtn").addEventListener("click",function(){
   sv();q("ntit").value="";q("ncnt").value="";q("nw-edit-id").value="";
   nedOpen=false;q("ned").style.display="none";
   updNwBtn();rNews();
+  // Forcer sauvegarde immédiate
+  if(window._sbDoSave)window._sbDoSave(D);
 });
 function rNews(){
   var l=q("nlst");
@@ -2068,7 +2087,15 @@ q("cinp").addEventListener("keypress",function(e){if(e.key==="Enter")sendMsg();}
 function sendMsg(){
   var t=gv("cinp").trim();if(!t)return;
   D.ms.push({id:Date.now(),ch:curC,tx:t,au:CU.u,ti:new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}),dt:new Date().toLocaleDateString("fr-FR")});
-  sv();q("cinp").value="";rMsgs();
+  // Sauvegarder localement
+  try{localStorage.setItem("gjm4",JSON.stringify(D));}catch(e){}
+  q("cinp").value="";rMsgs();
+  // Forcer sauvegarde IMMEDIATE sur Supabase
+  if(window._sbDoSave){
+    window._sbDoSave(D);
+  } else {
+    sv();
+  }
 }
 function rMsgs(){
   var ms=D.ms.filter(function(m){return m.ch===curC;});
@@ -2155,8 +2182,10 @@ q("sendnfbtn").addEventListener("click",function(){
     D.nf.unshift({id:Date.now(),ti:t,ms:m,au:CU.u,dt:new Date().toLocaleDateString("fr-FR")});
     ntf("Notification envoyee!","ok");
   }
-  sv();q("nft").value="";q("nfm").value="";q("ned2").style.display="none";q("nf-edit-id").value="";
+  try{localStorage.setItem("gjm4",JSON.stringify(D));}catch(e){}
+  q("nft").value="";q("nfm").value="";q("ned2").style.display="none";q("nf-edit-id").value="";
   rNflst();updHomeNf();
+  if(window._sbDoSave)window._sbDoSave(D); else sv();
 });
 function rNflst(){
   var l=q("nflst");
@@ -4037,5 +4066,190 @@ window._rNflstFull=function(){if(typeof rNflst==="undefined")return;};
     if(id==="pay"){rPayHistory();buildMoyens();}
   };
   window.rPayHistory=rPayHistory;
+})();
+</script>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// SERVICE WORKER — Notifications en arrière-plan
+// ════════════════════════════════════════════════════════════════
+(function(){
+  if(!('serviceWorker' in navigator)){console.warn('SW non supporté');return;}
+
+  // Créer le Service Worker comme blob URL
+  var swCode="\nconst CACHE_NAME = 'gjm-v1';\nconst SB_URL = 'https://rbnsymxybhihspknfqdb.supabase.co';\nconst SB_KEY = 'sb_publishable_F0GVlsQeKnCyKs5DWYgWKg_H6pYhZ4M';\nconst SB_API = SB_URL + '/rest/v1/gjm_data';\n\nlet lastSig = '';\nlet checkInterval = null;\n\nfunction getSig(d) {\n  try {\n    return (d.ms ? d.ms.length : 0) + '_' +\n           (d.nf ? d.nf.length : 0) + '_' +\n           (d.nw ? d.nw.length : 0) + '_' +\n           (d.mb ? d.mb.length : 0);\n  } catch(e) { return ''; }\n}\n\nasync function fetchData() {\n  try {\n    const r = await fetch(SB_API + '?id=eq.1&select=payload', {\n      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }\n    });\n    if (!r.ok) return null;\n    const rows = await r.json();\n    if (!rows || !rows.length || !rows[0].payload) return null;\n    return JSON.parse(rows[0].payload);\n  } catch(e) { return null; }\n}\n\nasync function checkForUpdates() {\n  const data = await fetchData();\n  if (!data) return;\n  const newSig = getSig(data);\n  if (newSig === lastSig) return;\n\n  // Détecter ce qui a changé\n  const oldParts = lastSig.split('_').map(Number);\n  const newParts = newSig.split('_').map(Number);\n\n  if (lastSig !== '') {\n    // Nouveau message\n    if (newParts[0] > oldParts[0] && data.ms && data.ms.length) {\n      const last = data.ms[data.ms.length - 1];\n      self.registration.showNotification('💬 Nouveau message — GJM', {\n        body: (last.au || '') + ': ' + (last.tx || '').substring(0, 80),\n        icon: data.logo || '/icon.png',\n        badge: data.logo || '/icon.png',\n        tag: 'msg-' + Date.now(),\n        data: { url: self.registration.scope + '#chat' }\n      });\n    }\n    // Nouvelle notification\n    if (newParts[1] > oldParts[1] && data.nf && data.nf.length) {\n      const last = data.nf[0];\n      self.registration.showNotification('🔔 ' + (last.ti || 'Notification') + ' — GJM', {\n        body: (last.ms || '').substring(0, 80),\n        icon: data.logo || '/icon.png',\n        tag: 'nf-' + Date.now(),\n        data: { url: self.registration.scope + '#ntf' }\n      });\n    }\n    // Nouvelle actualité\n    if (newParts[2] > oldParts[2] && data.nw && data.nw.length) {\n      const last = data.nw[0];\n      self.registration.showNotification('📰 Nouvelle actualite — GJM', {\n        body: last.ti || '',\n        icon: data.logo || '/icon.png',\n        tag: 'nw-' + Date.now(),\n        data: { url: self.registration.scope + '#news' }\n      });\n    }\n    // Nouveau membre\n    if (newParts[3] > oldParts[3]) {\n      self.registration.showNotification('👤 Nouveau membre — GJM', {\n        body: 'Un nouveau membre a rejoint l\\'association',\n        icon: data.logo || '/icon.png',\n        tag: 'mb-' + Date.now(),\n        data: { url: self.registration.scope + '#ann' }\n      });\n    }\n  }\n  lastSig = newSig;\n}\n\n// Clic sur notification → ouvrir l'app\nself.addEventListener('notificationclick', function(e) {\n  e.notification.close();\n  const url = (e.notification.data && e.notification.data.url) || self.registration.scope;\n  e.waitUntil(\n    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(list) {\n      for (let c of list) {\n        if (c.url.includes(self.registration.scope)) {\n          return c.focus();\n        }\n      }\n      return clients.openWindow(url);\n    })\n  );\n});\n\n// Démarrer la vérification toutes les 30 secondes en arrière-plan\nself.addEventListener('activate', function(e) {\n  e.waitUntil(self.clients.claim());\n  if (checkInterval) clearInterval(checkInterval);\n  checkInterval = setInterval(checkForUpdates, 30000);\n  checkForUpdates(); // vérifier immédiatement\n});\n\nself.addEventListener('install', function(e) {\n  self.skipWaiting();\n});\n";
+  var blob=new Blob([swCode],{type:'application/javascript'});
+  var swUrl=URL.createObjectURL(blob);
+
+  navigator.serviceWorker.register(swUrl,{scope:'./'})
+  .then(function(reg){
+    console.log('Service Worker enregistré');
+    window._swReg=reg;
+  })
+  .catch(function(e){
+    console.warn('SW erreur:',e);
+    // Fallback : utiliser l'URL directe si blob échoue (GitHub Pages)
+    navigator.serviceWorker.register('./sw.js',{scope:'./'})
+    .then(function(){console.log('SW fallback ok');})
+    .catch(function(){console.warn('SW fallback aussi échoué');});
+  });
+})();
+
+// ════════════════════════════════════════════════════════════════
+// NOTIFICATIONS PUSH + BADGES
+// ════════════════════════════════════════════════════════════════
+(function(){
+
+  var _lastMsCount=0, _lastNfCount=0, _lastNwCount=0;
+
+  // ── Demander permission notifications push ───────────────────
+  function askNotifPermission(){
+    if(!("Notification" in window))return;
+    if(Notification.permission==="default"){
+      Notification.requestPermission();
+    }
+  }
+
+  // ── Envoyer une notification push ───────────────────────────
+  function pushNotif(titre,corps,icone){
+    if(!("Notification" in window))return;
+    if(Notification.permission!=="granted")return;
+    try{
+      new Notification(titre,{
+        body:corps,
+        icon:icone||(window.D&&window.D.logo)||"",
+        badge:icone||(window.D&&window.D.logo)||"",
+        tag:"gjm-notif-"+Date.now()
+      });
+    }catch(e){console.warn("Push notif error:",e);}
+  }
+
+  // ── Mettre à jour les badges ─────────────────────────────────
+  function updBadges(){
+    var D=window.D,CU=window.CU;
+    if(!D||!CU)return;
+
+    // Badge messages non lus
+    var msCount=D.ms?D.ms.length:0;
+    var badge=document.getElementById("msg-badge");
+    var newMsgs=msCount-_lastMsCount;
+    if(newMsgs>0&&_lastMsCount>0){
+      // Nouveaux messages — notification push
+      var lastMs=D.ms[D.ms.length-1];
+      if(lastMs&&lastMs.au!==CU.u){
+        pushNotif(
+          "💬 Nouveau message — GJM",
+          lastMs.au+": "+lastMs.tx.substring(0,60),
+          D.logo||""
+        );
+      }
+      if(badge){
+        badge.style.display="flex";
+        badge.textContent=newMsgs>9?"9+":String(newMsgs);
+      }
+    }
+    _lastMsCount=msCount;
+
+    // Badge notifications
+    var nfCount=D.nf?D.nf.length:0;
+    var nfBadge=document.getElementById("nf-badge");
+    var newNfs=nfCount-_lastNfCount;
+    if(newNfs>0&&_lastNfCount>0){
+      var lastNf=D.nf[0];
+      if(lastNf){
+        pushNotif(
+          "🔔 "+lastNf.ti+" — GJM",
+          lastNf.ms?lastNf.ms.substring(0,80):"",
+          D.logo||""
+        );
+      }
+      if(nfBadge){
+        nfBadge.style.display="flex";
+        nfBadge.textContent=newNfs>9?"9+":String(newNfs);
+      }
+    }
+    _lastNfCount=nfCount;
+
+    // Nouvelle actualité
+    var nwCount=D.nw?D.nw.length:0;
+    var newNws=nwCount-_lastNwCount;
+    if(newNws>0&&_lastNwCount>0){
+      var lastNw=D.nw[0];
+      if(lastNw){
+        pushNotif(
+          "📰 Nouvelle actualite — GJM",
+          lastNw.ti,
+          D.logo||""
+        );
+      }
+    }
+    _lastNwCount=nwCount;
+  }
+
+  // Effacer badge messages quand on ouvre la page messages
+  var origGoPage=window.goPage;
+  window.goPage=function(id){
+    if(origGoPage)origGoPage(id);
+    if(id==="chat"){
+      var badge=document.getElementById("msg-badge");
+      if(badge){badge.style.display="none";badge.textContent="0";}
+    }
+    if(id==="ntf"){
+      var nfBadge=document.getElementById("nf-badge");
+      if(nfBadge){nfBadge.style.display="none";nfBadge.textContent="0";}
+    }
+  };
+
+  // Fonction pour activer les notifications (appelée par le bouton)
+  window.activerNotifs=function(){
+    if(!("Notification" in window)){
+      alert("Votre navigateur ne supporte pas les notifications.");return;
+    }
+    Notification.requestPermission().then(function(permission){
+      var panel=document.getElementById("notif-ask-panel");
+      if(permission==="granted"){
+        if(panel)panel.style.display="none";
+        // Sauvegarder le choix
+        try{localStorage.setItem("gjm_notif","granted");}catch(e){}
+        if(window.ntf)window.ntf("Notifications activees ! Vous recevrez des alertes.","ok");
+        // Tester une notification
+        setTimeout(function(){
+          new Notification("GJM — Notifications activees",{
+            body:"Vous recevrez des alertes pour les messages et actualites.",
+            icon:window.D&&window.D.logo||""
+          });
+        },500);
+      } else {
+        if(window.ntf)window.ntf("Notifications refusees. Vous pouvez les activer dans les parametres du navigateur.","er");
+      }
+    });
+  };
+
+  // Masquer le panel si déjà autorisé
+  function updNotifPanel(){
+    var panel=document.getElementById("notif-ask-panel");
+    if(!panel)return;
+    if(!("Notification" in window)||Notification.permission==="granted"){
+      panel.style.display="none";
+    } else {
+      panel.style.display="flex";
+    }
+  }
+
+  // Initialiser quand l'app démarre
+  window.addEventListener("load",function(){
+    setTimeout(function(){
+      updNotifPanel();
+      if(window.D){
+        _lastMsCount=window.D.ms?window.D.ms.length:0;
+        _lastNfCount=window.D.nf?window.D.nf.length:0;
+        _lastNwCount=window.D.nw?window.D.nw.length:0;
+      }
+    },2000);
+  });
+
+  // Vérifier les nouveaux messages à chaque sync Supabase
+  window._updBadges=updBadges;
+
 })();
 </script>
