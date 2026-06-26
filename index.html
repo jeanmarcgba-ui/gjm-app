@@ -136,6 +136,14 @@ window.jbStartSync=function(){
   // Sync toutes les 2 secondes
   setInterval(doSync, 2000);
   doSync(); // première sync immédiate
+  // Exposer forceSync pour le bouton Actualiser
+  window.forceSync=function(){
+    var btn=document.getElementById("refresh-btn");
+    if(btn){btn.style.transform="rotate(360deg)";btn.style.transition="transform .5s";}
+    setTimeout(function(){if(btn){btn.style.transform="";btn.style.transition="";}},500);
+    _sbLastSig="";_sbLastTs=""; // forcer la re-sync complète
+    doSync();
+  };
 };
 </script>
 
@@ -403,6 +411,8 @@ tr:hover td{background:var(--gc);}
       <div class="bt"><h2 id="hname">Association GJM</h2><span>Systeme de Gestion</span></div>
     </div>
     <div class="hr">
+     
+      <button onclick="forceSync()" title="Actualiser" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.15);color:#fff;border:none;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center" id="refresh-btn">&#128260;</button>
       <div class="ubadge"><div class="dot"></div><span id="cusr">-</span></div>
       <button class="blg" id="logoutbtn">Deconnexion</button>
     </div>
@@ -4596,28 +4606,42 @@ window._rNflstFull=function(){if(typeof rNflst==="undefined")return;};
   var audioCallBtn=q("call-audio-btn");
   if(audioCallBtn)audioCallBtn.addEventListener("click",function(){
     var target=window.curC;
-    if(!target||target==="Groupe"){openCallSelect(false);return;}
-    startCall(target,false);
+    if(!target||target==="Groupe"){
+      openCallSelect(false); // Montrer la liste des membres
+    } else {
+      startCall(target,false);
+    }
   });
 
   var videoCallBtn=q("call-video-btn");
   if(videoCallBtn)videoCallBtn.addEventListener("click",function(){
     var target=window.curC;
-    if(!target||target==="Groupe"){openCallSelect(true);return;}
-    startCall(target,true);
+    if(!target||target==="Groupe"){
+      openCallSelect(true); // Montrer la liste des membres
+    } else {
+      startCall(target,true);
+    }
   });
 
   // Bouton liste membres
   var membersCallBtn=q("call-members-btn");
-  if(membersCallBtn)membersCallBtn.addEventListener("click",function(){openCallSelect(null);});
+  if(membersCallBtn)membersCallBtn.addEventListener("click",function(){
+    openCallSelect(null); // Ouvrir directement la liste
+  });
 
   var _callSelectType=null;
   function openCallSelect(isVideo){
     _callSelectType=isVideo;
     var modal=q("call-select-modal");if(!modal)return;
+    // Toujours construire la liste à jour
+    var D=window.D;
+    if(!D||!D.mb||!D.mb.length){
+      if(window.ntf)window.ntf("Aucun membre dans l'annuaire. Ajoutez des membres d'abord.","er");
+      return;
+    }
     buildMemberList("");
     modal.style.display="flex";modal.style.alignItems="center";modal.style.justifyContent="center";
-    var search=q("call-member-search");if(search){search.value="";search.focus();}
+    setTimeout(function(){var search=q("call-member-search");if(search){search.value="";search.focus();}},100);
   }
 
   var searchInp=q("call-member-search");
