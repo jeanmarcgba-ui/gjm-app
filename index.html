@@ -148,15 +148,59 @@ window.jbStartSync=function(){
   _doSync(false); // première sync immédiate
 };
 
-// Bouton Actualiser
+// Bouton Actualiser — recharge les données sans déconnecter ni recharger la page
 window.forceSync=function(){
   var btn=document.getElementById("refresh-btn");
-  if(btn){
-    btn.innerHTML="&#9203;";
-    setTimeout(function(){btn.innerHTML="&#128260;";},1000);
+  if(btn){btn.innerHTML="&#9203;";btn.disabled=true;}
+  _jbSetStatus("&#9729; Actualisation...","#fff3cd","#856404");
+
+  function applyAndRefresh(data){
+    if(data){
+      Object.keys(data).forEach(function(k){window.D[k]=data[k];});
+      try{localStorage.setItem("gjm4",JSON.stringify(window.D));}catch(e){}
+    }
+    // Rafraîchir toute l'UI sans déconnecter
+    if(typeof rMtbl==="function")rMtbl();
+    if(typeof rUtbl==="function")rUtbl();
+    if(typeof rKtbl==="function")rKtbl();
+    if(typeof rNflst==="function")rNflst();
+    if(typeof rNews==="function")rNews();
+    if(typeof rDtbl==="function")rDtbl();
+    if(typeof rCtbl==="function")rCtbl();
+    if(typeof rMsgs==="function")rMsgs();
+    if(window.rShop)window.rShop();
+    if(typeof rGal==="function")rGal();
+    if(window.rPayHistory)window.rPayHistory();
+    if(typeof updUI==="function")updUI();
+    if(typeof updSt==="function")updSt();
+    if(typeof updHomeNf==="function")updHomeNf();
+    if(typeof rCcont==="function")rCcont();
+    if(typeof rEvlst==="function")rEvlst();
+    // Remettre le bouton
+    if(btn){btn.innerHTML="&#128260;";btn.disabled=false;}
+    _jbSetStatus("&#128994; Sync","#d4edda","#155724");
+    if(window.ntf)window.ntf("Application actualisee !","ok");
   }
-  _sbLastSig="";_sbLastTs="";
-  _doSync(true);
+
+  // Charger les données fraîches depuis Supabase
+  if(window.jbLoad){
+    var done=false;
+    window.jbLoad(function(data){
+      done=true;
+      _sbLastSig="";_sbLastTs="";
+      applyAndRefresh(data);
+    });
+    // Timeout 5s : si Supabase ne répond pas, rafraîchir quand même avec données locales
+    setTimeout(function(){
+      if(!done){
+        if(btn){btn.innerHTML="&#128260;";btn.disabled=false;}
+        applyAndRefresh(null);
+        if(window.ntf)window.ntf("Actualise depuis les donnees locales","");
+      }
+    },5000);
+  } else {
+    applyAndRefresh(null);
+  }
 };
 </script>
 
@@ -1361,6 +1405,24 @@ function ld(){
 ld();
 var CU=null,cy=new Date().getFullYear(),cm=new Date().getMonth(),curC="Groupe";
 
+// Restaurer la session au rechargement (sans mot de passe)
+function restoreSession(){
+  try{
+    var sess=localStorage.getItem("gjm_session");
+    if(!sess)return false;
+    var f=JSON.parse(sess);
+    if(!f||!f.u)return false;
+    // Chercher l'utilisateur dans D.us
+    for(var i=0;i<D.us.length;i++){
+      if(D.us[i].u===f.u){
+        CU=D.us[i];window.CU=CU;
+        return true;
+      }
+    }
+  }catch(e){}
+  return false;
+}
+
 function isExp(){if(!D.exp)return false;return new Date()>new Date(D.exp);}
 function chkBlock(){
   if(D.exp&&isExp()){
@@ -1370,6 +1432,28 @@ function chkBlock(){
   }
   return false;
 }
+// Tenter de restaurer la session au chargement
+setTimeout(function(){
+  if(window.jbLoad){
+    // Charger d'abord les données fraîches depuis Supabase
+    window.jbLoad(function(data){
+      if(data){
+        Object.keys(data).forEach(function(k){D[k]=data[k];});
+        try{localStorage.setItem("gjm4",JSON.stringify(D));}catch(e){}
+      }
+      // Puis restaurer la session
+      if(restoreSession()){
+        startApp();
+      }
+    });
+    // Timeout : si Supabase ne répond pas, utiliser les données locales
+    setTimeout(function(){
+      if(!CU&&restoreSession())startApp();
+    },3000);
+  } else {
+    if(restoreSession())startApp();
+  }
+},100);
 
 function q(id){return document.getElementById(id);}
 function gv(id){var el=q(id);return el?el.value:"";}
@@ -1429,7 +1513,10 @@ function doLogin(){
       if(e){e.innerHTML="Identifiants incorrects. Si vous venez d'etre ajoute, attendez 10 secondes et reessayez.";e.style.display="block";setTimeout(function(){e.style.display="none";},6000);}
       return;
     }
-    CU=f;window.CU=CU;startApp();
+    CU=f;window.CU=CU;
+  // Sauvegarder la session pour rechargement sans mot de passe
+  try{localStorage.setItem("gjm_session",JSON.stringify({u:f.u,r:f.r,l:f.l}));}catch(ex){}
+  startApp();
   }
 
   // Toujours charger les données fraîches depuis JSONBin avant de vérifier
@@ -1458,7 +1545,9 @@ function doLogin(){
   }
 }
 q("logoutbtn").addEventListener("click",function(){
-  CU=null;window.CU=null;q("pg-app").style.display="none";q("pg-login").style.display="flex";
+  CU=null;window.CU=null;
+  try{localStorage.removeItem("gjm_session");}catch(e){}
+  q("pg-app").style.display="none";q("pg-login").style.display="flex";
 });
 q("unlbtn").addEventListener("click",function(){
   var k=gv("ukey"),cr=null;
