@@ -72,18 +72,21 @@ window._sbDoSave=function(data){
 
 // ── CHARGER depuis Supabase ───────────────────────────────────
 window.jbLoad=function(cb){
+  console.log("jbLoad appelé, URL:", SB_API+"?id=eq.1&select=payload,updated_at");
   fetch(SB_API+"?id=eq.1&select=payload,updated_at",{
     headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY}
   }).then(function(r){
+    console.log("jbLoad réponse HTTP:", r.status);
     if(!r.ok)throw new Error("HTTP "+r.status);
     return r.json();
   }).then(function(rows){
+    console.log("jbLoad rows:", rows?rows.length+" lignes":"null");
     if(!rows||!rows.length||!rows[0].payload)return;
     var data=JSON.parse(rows[0].payload);
     if(!data||typeof data!=="object")return;
     _sbLastSig=_jbSig(data);
     cb(data);
-  }).catch(function(e){console.warn("Supabase load:",e.message);});
+  }).catch(function(e){console.warn("Supabase load erreur:",e.message);});
 };
 
 // ── SYNC toutes les 2 secondes ────────────────────────────────
@@ -155,6 +158,7 @@ window.forceSync=function(){
   _jbSetStatus("&#9729; Actualisation...","#fff3cd","#856404");
 
   function applyAndRefresh(data){
+    console.log("applyAndRefresh appelé, data:", data?"OK":"null");
     if(data){
       Object.keys(data).forEach(function(k){window.D[k]=data[k];});
       try{localStorage.setItem("gjm4",JSON.stringify(window.D));}catch(e){}
@@ -4318,25 +4322,17 @@ window._rNflstFull=function(){if(typeof rNflst==="undefined")return;};
 // SERVICE WORKER — Notifications en arrière-plan
 // ════════════════════════════════════════════════════════════════
 (function(){
-  if(!('serviceWorker' in navigator)){console.warn('SW non supporté');return;}
-
-  // Créer le Service Worker comme blob URL
-  var swCode="\nconst CACHE_NAME = 'gjm-v1';\nconst SB_URL = 'https://rbnsymxybhihspknfqdb.supabase.co';\nconst SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJibnN5bXh5YmhpaHNwa25mcWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0NTk4MDQsImV4cCI6MjA5ODAzNTgwNH0.S5Fhnsxhp2-fpThZnCksMoYNyHg-7Kr0FVtGX0ZEdUY';\nconst SB_API = SB_URL + '/rest/v1/gjm_data';\n\nlet lastSig = '';\nlet checkInterval = null;\n\nfunction getSig(d) {\n  try {\n    return (d.ms ? d.ms.length : 0) + '_' +\n           (d.nf ? d.nf.length : 0) + '_' +\n           (d.nw ? d.nw.length : 0) + '_' +\n           (d.mb ? d.mb.length : 0);\n  } catch(e) { return ''; }\n}\n\nasync function fetchData() {\n  try {\n    const r = await fetch(SB_API + '?id=eq.1&select=payload', {\n      headers: { 'apikey': SB_KEY, 'Authorization': 'Bearer ' + SB_KEY }\n    });\n    if (!r.ok) return null;\n    const rows = await r.json();\n    if (!rows || !rows.length || !rows[0].payload) return null;\n    return JSON.parse(rows[0].payload);\n  } catch(e) { return null; }\n}\n\nasync function checkForUpdates() {\n  const data = await fetchData();\n  if (!data) return;\n  const newSig = getSig(data);\n  if (newSig === lastSig) return;\n\n  // Détecter ce qui a changé\n  const oldParts = lastSig.split('_').map(Number);\n  const newParts = newSig.split('_').map(Number);\n\n  if (lastSig !== '') {\n    // Nouveau message\n    if (newParts[0] > oldParts[0] && data.ms && data.ms.length) {\n      const last = data.ms[data.ms.length - 1];\n      self.registration.showNotification('💬 Nouveau message — GJM', {\n        body: (last.au || '') + ': ' + (last.tx || '').substring(0, 80),\n        icon: data.logo || '/icon.png',\n        badge: data.logo || '/icon.png',\n        tag: 'msg-' + Date.now(),\n        data: { url: self.registration.scope + '#chat' }\n      });\n    }\n    // Nouvelle notification\n    if (newParts[1] > oldParts[1] && data.nf && data.nf.length) {\n      const last = data.nf[0];\n      self.registration.showNotification('🔔 ' + (last.ti || 'Notification') + ' — GJM', {\n        body: (last.ms || '').substring(0, 80),\n        icon: data.logo || '/icon.png',\n        tag: 'nf-' + Date.now(),\n        data: { url: self.registration.scope + '#ntf' }\n      });\n    }\n    // Nouvelle actualité\n    if (newParts[2] > oldParts[2] && data.nw && data.nw.length) {\n      const last = data.nw[0];\n      self.registration.showNotification('📰 Nouvelle actualite — GJM', {\n        body: last.ti || '',\n        icon: data.logo || '/icon.png',\n        tag: 'nw-' + Date.now(),\n        data: { url: self.registration.scope + '#news' }\n      });\n    }\n    // Nouveau membre\n    if (newParts[3] > oldParts[3]) {\n      self.registration.showNotification('👤 Nouveau membre — GJM', {\n        body: 'Un nouveau membre a rejoint l\\'association',\n        icon: data.logo || '/icon.png',\n        tag: 'mb-' + Date.now(),\n        data: { url: self.registration.scope + '#ann' }\n      });\n    }\n  }\n  lastSig = newSig;\n}\n\n// Clic sur notification → ouvrir l'app\nself.addEventListener('notificationclick', function(e) {\n  e.notification.close();\n  const url = (e.notification.data && e.notification.data.url) || self.registration.scope;\n  e.waitUntil(\n    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(list) {\n      for (let c of list) {\n        if (c.url.includes(self.registration.scope)) {\n          return c.focus();\n        }\n      }\n      return clients.openWindow(url);\n    })\n  );\n});\n\n// Démarrer la vérification toutes les 30 secondes en arrière-plan\nself.addEventListener('activate', function(e) {\n  e.waitUntil(self.clients.claim());\n  if (checkInterval) clearInterval(checkInterval);\n  checkInterval = setInterval(checkForUpdates, 30000);\n  checkForUpdates(); // vérifier immédiatement\n});\n\nself.addEventListener('install', function(e) {\n  self.skipWaiting();\n});\n";
-  var blob=new Blob([swCode],{type:'application/javascript'});
-  var swUrl=URL.createObjectURL(blob);
-
-  navigator.serviceWorker.register(swUrl,{scope:'./'})
+  if(!('serviceWorker' in navigator))return;
+  // Utiliser uniquement sw.js (pas de blob sur GitHub Pages)
+  navigator.serviceWorker.register('./sw.js',{scope:'./'})
   .then(function(reg){
-    console.log('Service Worker enregistré');
     window._swReg=reg;
+    console.log('SW ok');
+    if('Notification' in window && Notification.permission==='default'){
+      // Ne pas demander automatiquement - attendre le bouton
+    }
   })
-  .catch(function(e){
-    console.warn('SW erreur:',e);
-    // Fallback : utiliser l'URL directe si blob échoue (GitHub Pages)
-    navigator.serviceWorker.register('./sw.js',{scope:'./'})
-    .then(function(){console.log('SW fallback ok');})
-    .catch(function(){console.warn('SW fallback aussi échoué');});
-  });
+  .catch(function(e){console.warn('SW erreur:',e.message);});
 })();
 
 // ════════════════════════════════════════════════════════════════
