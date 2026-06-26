@@ -365,7 +365,7 @@ tr:hover td{background:var(--gc);}
   .sb>div:first-child{display:none;} /* cacher les titres de section */
   .sbt{display:none;}
   .sb{display:flex;flex-direction:row;flex-wrap:nowrap;overflow-x:auto;padding:6px 4px;gap:0;-webkit-overflow-scrolling:touch;}
-  .ni{flex-direction:column;gap:3px;padding:8px 10px;font-size:.62rem;min-width:60px;text-align:center;border-left:none;border-bottom:3px solid transparent;white-space:nowrap;}
+  .ni{flex-direction:column;gap:2px;padding:6px 8px;font-size:.58rem;min-width:52px;text-align:center;border-left:none;border-bottom:3px solid transparent;white-space:nowrap;}
   .ni.act{border-left:none;border-bottom-color:var(--b);background:#eef3ff;}
   .ni .ic{font-size:1.2rem;width:auto;}
   .ni span:last-child{font-size:.6rem;}
@@ -1599,6 +1599,18 @@ function startApp(){
   setInterval(updCd,60000);
   ntf("Bienvenue "+CU.u+"!","ok");
   rMtbl();rNews();rNflst();rDocs();rDtbl();rCtbl();rCcont();rUtbl();rKtbl();rMsgs();if(window.rShop)window.rShop();rGal();
+  // Masquer les menus selon le rôle
+  var isMgrRole=CU.r==="creator"||CU.r==="admin"||CU.r==="tresorier";
+  // Inscription : visible seulement pour mgr
+  var niIns=document.querySelector('.ni[data-pg="ins"]');
+  if(niIns)niIns.style.display=isMgrRole?"flex":"none";
+  // Annuaire : visible pour tous
+  // Utilisateurs : seulement créateur/admin
+  var niUsr=document.querySelector('.ni[data-pg="usr"]');
+  if(niUsr)niUsr.style.display=(CU.r==="creator"||CU.r==="admin")?"flex":"none";
+  // Options : seulement créateur/admin
+  var niOpt=document.querySelector('[id="ni-opt"]');
+  if(niOpt)niOpt.style.display=(CU.r==="creator"||CU.r==="admin")?"flex":"none";
   // Démarrer la synchronisation JSONBin
   if(window.jbStartSync&&!window._jbSyncStarted){
     window._jbSyncStarted=true;
@@ -2970,12 +2982,17 @@ function updSt(){
 window.updSt=updSt;
 
 function updCd(){
-  if(!D.exp){q("cbar").style.display="none";return;}
-  var b=q("cbar"),diff=new Date(D.exp)-new Date();
-  if(diff<=0){b.style.display="block";b.style.background="var(--er)";b.textContent="Application expiree!";return;}
-  var days=Math.floor(diff/86400000);b.style.display="block";
+  var b=q("cbar");if(!b)return;
+  // Ne pas afficher si pas de date ou date dépassée
+  if(!D.exp){b.style.display="none";return;}
+  var diff=new Date(D.exp)-new Date();
+  if(diff<=0){b.style.display="none";return;} // Cacher si expiré
+  var days=Math.floor(diff/86400000);
+  // Afficher seulement si expiration dans moins de 30 jours
+  if(days>30){b.style.display="none";return;}
+  b.style.display="block";
   b.textContent="Expiration dans "+days+" jour(s) - "+new Date(D.exp).toLocaleDateString("fr-FR");
-  b.style.background=days<=7?"var(--er)":days<=30?"var(--wa)":"var(--ok)";
+  b.style.background=days<=7?"var(--er)":"var(--wa)";
 }
 updUI();
 
