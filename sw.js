@@ -1,5 +1,5 @@
 const SB_URL = 'https://rbnsymxybhihspknfqdb.supabase.co';
-const SB_KEY = 'sb_publishable_F0GVlsQeKnCyKs5DWYgWKg_H6pYhZ4M';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJibnN5bXh5YmhpaHNwa25mcWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0NTk4MDQsImV4cCI6MjA5ODAzNTgwNH0.S5Fhnsxhp2-fpThZnCksMoYNyHg-7Kr0FVtGX0ZEdUY';
 const SB_API = SB_URL + '/rest/v1/gjm_data';
 
 let lastSig = '';
