@@ -9,15 +9,18 @@
 var SB_URL="https://rbnsymxybhihspknfqdb.supabase.co";
 var SB_KEY="sb_publishable_F0GVlsQeKnCyKs5DWYgWKg_H6pYhZ4M";
 var SB_API=SB_URL+"/rest/v1/gjm_data";
-var _sbLastSig="",_sbSaveTimer=null,_sbBusy=false;
+var _sbLastSig="",_sbLastTs="",_sbSaveTimer=null,_sbBusy=false;
 
 function _sbH(){return{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json"};}
 
 function _jbSig(d){
   try{
+    // Compter uniquement les vrais messages (pas les signaux d'appel)
+    var msCount=0;
+    if(d.ms)d.ms.forEach(function(m){if(!m.signal)msCount++;});
     return (d.mb?d.mb.length:0)+"_"+(d.us?d.us.length:0)+"_"+(d.ct?d.ct.length:0)+"_"
           +(d.kp?d.kp.length:0)+"_"+(d.dn?d.dn.length:0)+"_"+(d.nw?d.nw.length:0)+"_"
-          +(d.ev?d.ev.length:0)+"_"+(d.ms?d.ms.length:0)+"_"+(d.nf?d.nf.length:0)+"_"
+          +(d.ev?d.ev.length:0)+"_"+msCount+"_"+(d.nf?d.nf.length:0)+"_"
           +(d.cmd?d.cmd.length:0)+"_"+(d.sh?d.sh.length:0)+"_"+(d.gl?d.gl.length:0)+"_"
           +(d.payhist?d.payhist.length:0)+"_"+(d.an||"")+"_"+(d.logo?"1":"0");
   }catch(e){return "";}
@@ -35,7 +38,7 @@ function _sbWrite(data,cb){
   fetch(SB_API,{
     method:"POST",
     headers:Object.assign(_sbH(),{"Prefer":"resolution=merge-duplicates"}),
-    body:JSON.stringify({id:1,payload:JSON.stringify(data)})
+    body:JSON.stringify({id:1,payload:JSON.stringify(data),updated_at:new Date().toISOString()})
   }).then(function(r){
     if(r.ok||r.status===201||r.status===204){
       _sbLastSig=_jbSig(data);
@@ -51,13 +54,16 @@ function _sbWrite(data,cb){
   });
 }
 
-// Sauvegarde avec debounce 1s (pour les actions normales)
+// Sauvegarde avec debounce 800ms
 window.jbSave=function(data){
   clearTimeout(_sbSaveTimer);
-  _sbSaveTimer=setTimeout(function(){_sbWrite(data);},1000);
+  _sbSaveTimer=setTimeout(function(){
+    _sbLastSig=""; // forcer la re-sync chez les autres
+    _sbWrite(data);
+  },800);
 };
 
-// Sauvegarde IMMÉDIATE (pour messages, notifications)
+// Sauvegarde IMMÉDIATE
 window._sbDoSave=function(data){
   clearTimeout(_sbSaveTimer);
   _jbSetStatus("&#9729; Envoi...","#fff3cd","#856404");
@@ -66,7 +72,7 @@ window._sbDoSave=function(data){
 
 // ── CHARGER depuis Supabase ───────────────────────────────────
 window.jbLoad=function(cb){
-  fetch(SB_API+"?id=eq.1&select=payload",{
+  fetch(SB_API+"?id=eq.1&select=payload,updated_at",{
     headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY}
   }).then(function(r){
     if(!r.ok)throw new Error("HTTP "+r.status);
@@ -83,7 +89,7 @@ window.jbLoad=function(cb){
 // ── SYNC toutes les 2 secondes ────────────────────────────────
 window.jbStartSync=function(){
   function doSync(){
-    fetch(SB_API+"?id=eq.1&select=payload",{
+    fetch(SB_API+"?id=eq.1&select=payload,updated_at",{
       headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY}
     }).then(function(r){
       if(!r.ok)throw new Error("HTTP "+r.status);
@@ -93,8 +99,11 @@ window.jbStartSync=function(){
       var data=JSON.parse(rows[0].payload);
       if(!data||typeof data!=="object")return;
       var newSig=_jbSig(data);
-      if(newSig===_sbLastSig)return; // Rien de nouveau
+      // Vérifier aussi le timestamp de mise à jour
+      var newTs=(rows[0].updated_at||"");
+      if(newSig===_sbLastSig&&newTs===_sbLastTs)return;
       _sbLastSig=newSig;
+      _sbLastTs=newTs;
       // Appliquer les nouvelles données
       var before=JSON.stringify(window.D);
       Object.keys(data).forEach(function(k){window.D[k]=data[k];});
@@ -641,6 +650,7 @@ tr:hover td{background:var(--gc);}
                 <div style="display:flex;gap:8px">
                   <button id="call-audio-btn" title="Appel audio" style="width:38px;height:38px;border-radius:50%;background:#27ae60;color:#fff;border:none;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center">&#128222;</button>
                   <button id="call-video-btn" title="Appel video" style="width:38px;height:38px;border-radius:50%;background:var(--b);color:#fff;border:none;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center">&#128249;</button>
+                  <button id="call-members-btn" title="Appeler un membre" style="width:38px;height:38px;border-radius:50%;background:var(--o);color:#fff;border:none;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center">&#128100;</button>
                 </div>
               </div>
               <div class="cmsgs" id="cmsgs"></div>
@@ -654,6 +664,16 @@ tr:hover td{background:var(--gc);}
             </div>
           </div>
         </div>
+        <!-- Modal sélection membre à appeler -->
+        <div id="call-select-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99997;align-items:center;justify-content:center">
+          <div style="background:#fff;border-radius:18px;padding:24px;width:380px;max-width:95vw;max-height:80vh;overflow-y:auto">
+            <div style="font-weight:700;color:var(--b);font-size:1.05rem;margin-bottom:16px">&#128100; Appeler un membre</div>
+            <input type="text" id="call-member-search" placeholder="Rechercher un membre..." style="width:100%;padding:10px;border:2px solid var(--g);border-radius:10px;font-size:.9rem;margin-bottom:14px;box-sizing:border-box">
+            <div id="call-member-list" style="display:flex;flex-direction:column;gap:8px"></div>
+            <button onclick="document.getElementById('call-select-modal').style.display='none'" class="btn" style="background:var(--g);width:100%;margin-top:14px">Fermer</button>
+          </div>
+        </div>
+
         <!-- Modal Appel Audio/Video -->
         <div id="call-modal" style="display:none;position:fixed;inset:0;background:rgba(10,20,40,.95);z-index:99999;flex-direction:column;align-items:center;justify-content:center">
           <!-- Vidéos -->
@@ -4572,19 +4592,68 @@ window._rNflstFull=function(){if(typeof rNflst==="undefined")return;};
   function hideIncomingCall(){var ic=q("incoming-call-modal");if(ic)ic.style.display="none";}
 
   // ── Boutons ───────────────────────────────────────────────────
+  // Appel direct depuis la conv privée
   var audioCallBtn=q("call-audio-btn");
   if(audioCallBtn)audioCallBtn.addEventListener("click",function(){
     var target=window.curC;
-    if(!target||target==="Groupe"){if(window.ntf)window.ntf("Sélectionnez un membre pour appeler","er");return;}
+    if(!target||target==="Groupe"){openCallSelect(false);return;}
     startCall(target,false);
   });
 
   var videoCallBtn=q("call-video-btn");
   if(videoCallBtn)videoCallBtn.addEventListener("click",function(){
     var target=window.curC;
-    if(!target||target==="Groupe"){if(window.ntf)window.ntf("Sélectionnez un membre pour appeler","er");return;}
+    if(!target||target==="Groupe"){openCallSelect(true);return;}
     startCall(target,true);
   });
+
+  // Bouton liste membres
+  var membersCallBtn=q("call-members-btn");
+  if(membersCallBtn)membersCallBtn.addEventListener("click",function(){openCallSelect(null);});
+
+  var _callSelectType=null;
+  function openCallSelect(isVideo){
+    _callSelectType=isVideo;
+    var modal=q("call-select-modal");if(!modal)return;
+    buildMemberList("");
+    modal.style.display="flex";modal.style.alignItems="center";modal.style.justifyContent="center";
+    var search=q("call-member-search");if(search){search.value="";search.focus();}
+  }
+
+  var searchInp=q("call-member-search");
+  if(searchInp)searchInp.addEventListener("input",function(){buildMemberList(this.value);});
+
+  function buildMemberList(filter){
+    var list=q("call-member-list");if(!list)return;
+    var D=window.D;if(!D||!D.mb)return;
+    var fl=(filter||"").toLowerCase();
+    var members=D.mb.filter(function(m){
+      var nm=(m.pr+" "+m.nm).toLowerCase();
+      return !fl||nm.indexOf(fl)>-1;
+    });
+    if(!members.length){
+      list.innerHTML="<div style='text-align:center;color:#aab;padding:20px'>Aucun membre trouvé</div>";
+      return;
+    }
+    list.innerHTML=members.map(function(m){
+      var nm=m.pr+" "+m.nm;
+      var ini=(m.pr[0]||"")+(m.nm[0]||"");
+      var card="<div style=\"display:flex;align-items:center;gap:12px;padding:10px;border-radius:10px;border:1.5px solid var(--g);cursor:pointer\">"
+        +"<div style=\"width:40px;height:40px;border-radius:50%;background:var(--b);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem\">"+ini.toUpperCase()+"</div>"
+        +"<div style=\"flex:1;font-weight:600;color:var(--b)\">"+nm+"</div>"
+        +"<div style=\"display:flex;gap:6px\">"
+          +"<button onclick=\"startCallMember('"+nm+"',false)\" style=\"width:34px;height:34px;border-radius:50%;background:#27ae60;color:#fff;border:none;cursor:pointer\">&#128222;</button>"
+          +"<button onclick=\"startCallMember('"+nm+"',true)\" style=\"width:34px;height:34px;border-radius:50%;background:var(--b);color:#fff;border:none;cursor:pointer\">&#128249;</button>"
+        +"</div>"
+      +"</div>";
+      return card;
+    }).join("");
+  }
+
+  window.startCallMember=function(memberName,isVideo){
+    var modal=q("call-select-modal");if(modal)modal.style.display="none";
+    startCall(memberName,isVideo);
+  };
 
   var endBtn=q("call-end-btn");
   if(endBtn)endBtn.addEventListener("click",function(){
