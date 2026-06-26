@@ -164,22 +164,22 @@ window.forceSync=function(){
       try{localStorage.setItem("gjm4",JSON.stringify(window.D));}catch(e){}
     }
     // Rafraîchir toute l'UI sans déconnecter
-    if(typeof rMtbl==="function")rMtbl();
-    if(typeof rUtbl==="function")rUtbl();
-    if(typeof rKtbl==="function")rKtbl();
-    if(typeof rNflst==="function")rNflst();
-    if(typeof rNews==="function")rNews();
-    if(typeof rDtbl==="function")rDtbl();
-    if(typeof rCtbl==="function")rCtbl();
-    if(typeof rMsgs==="function")rMsgs();
+    if(window.rMtbl)window.rMtbl();
+    if(window.rUtbl)window.rUtbl();
+    if(window.rKtbl)window.rKtbl();
+    if(window.rNflst)window.rNflst();
+    if(window.rNews)window.rNews();
+    if(window.rDtbl)window.rDtbl();
+    if(window.rCtbl)window.rCtbl();
+    if(window.rMsgs)window.rMsgs();
     if(window.rShop)window.rShop();
-    if(typeof rGal==="function")rGal();
+    if(window.rGal)window.rGal();
     if(window.rPayHistory)window.rPayHistory();
-    if(typeof updUI==="function")updUI();
-    if(typeof updSt==="function")updSt();
-    if(typeof updHomeNf==="function")updHomeNf();
-    if(typeof rCcont==="function")rCcont();
-    if(typeof rEvlst==="function")rEvlst();
+    if(window.updUI)window.updUI();
+    if(window.updSt)window.updSt();
+    if(window.updHomeNf)window.updHomeNf();
+    if(window.rCcont)window.rCcont();
+    if(window.rEvlst)window.rEvlst();
     // Remettre le bouton
     if(btn){btn.innerHTML="&#128260;";btn.disabled=false;}
     _jbSetStatus("&#128994; Sync","#d4edda","#155724");
@@ -1428,6 +1428,11 @@ function restoreSession(){
 }
 
 function isExp(){if(!D.exp)return false;return new Date()>new Date(D.exp);}
+// Afficher la page login si nécessaire
+function showLogin(){
+  var pg=document.getElementById("pg-login");
+  if(pg)pg.style.display="flex";
+}
 function chkBlock(){
   if(D.exp&&isExp()){
     q("pg-login").style.display="none";
@@ -1436,28 +1441,53 @@ function chkBlock(){
   }
   return false;
 }
-// Tenter de restaurer la session au chargement
-setTimeout(function(){
+// Restaurer la session au chargement
+// 1. Essayer d'abord avec les données locales (immédiat)
+var _sessionRestored=false;
+if(restoreSession()){
+  _sessionRestored=true;
+  // Démarrer l'app immédiatement avec données locales
+  setTimeout(function(){
+    startApp();
+    // Puis mettre à jour avec données Supabase en arrière-plan
+    if(window.jbLoad){
+      window.jbLoad(function(data){
+        if(data){
+          Object.keys(data).forEach(function(k){D[k]=data[k];});
+          try{localStorage.setItem("gjm4",JSON.stringify(D));}catch(e){}
+          // Rafraîchir l'UI avec nouvelles données
+          if(window.rMtbl)window.rMtbl();
+          if(window.rMsgs)window.rMsgs();
+          if(window.rNews)window.rNews();
+          if(window.updSt)window.updSt();
+        }
+      });
+    }
+  },50);
+} else {
+  // Pas de session locale - essayer Supabase
   if(window.jbLoad){
-    // Charger d'abord les données fraîches depuis Supabase
     window.jbLoad(function(data){
       if(data){
         Object.keys(data).forEach(function(k){D[k]=data[k];});
         try{localStorage.setItem("gjm4",JSON.stringify(D));}catch(e){}
       }
-      // Puis restaurer la session
-      if(restoreSession()){
+      if(!_sessionRestored&&restoreSession()){
+        _sessionRestored=true;
         startApp();
+      } else if(!_sessionRestored){
+        // Aucune session trouvée - afficher la page login
+        showLogin();
       }
     });
-    // Timeout : si Supabase ne répond pas, utiliser les données locales
+    // Timeout 5s : afficher login si Supabase ne répond pas
     setTimeout(function(){
-      if(!CU&&restoreSession())startApp();
-    },3000);
+      if(!_sessionRestored)showLogin();
+    },5000);
   } else {
-    if(restoreSession())startApp();
+    showLogin();
   }
-},100);
+}
 
 function q(id){return document.getElementById(id);}
 function gv(id){var el=q(id);return el?el.value:"";}
@@ -2781,6 +2811,16 @@ window.kpDel=kpDel;
 
 // DOCUMENTS
 window.rKtbl=rKtbl;
+window.rMsgs=function(){if(typeof rMsgs==="function")rMsgs();};
+window.rMtbl=function(){if(typeof rMtbl==="function")rMtbl();};
+window.rNflst=function(){if(typeof rNflst==="function")rNflst();};
+window.rNews=function(){if(typeof rNews==="function")rNews();};
+window.rDtbl=function(){if(typeof rDtbl==="function")rDtbl();};
+window.rCtbl=function(){if(typeof rCtbl==="function")rCtbl();};
+window.rEvlst=function(){if(typeof rEvlst==="function")rEvlst();};
+window.rCcont=function(){if(typeof rCcont==="function")rCcont();};
+window.rGal=function(){if(typeof rGal==="function")rGal();};
+window.rUtbl=function(){if(typeof rUtbl==="function")rUtbl();};
 
 function rDocs(){if(window.svBuildGrid){window.svBuildGrid();return;}var l=q("dlst");if(l)l.innerHTML="<div class='alert ai'>Chargement...</div>";}
 
