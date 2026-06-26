@@ -1461,30 +1461,10 @@ function _hideLoading(){
 }
 
 function _doRestore(){
-  // 1. Essayer avec données locales (immédiat)
-  if(restoreSession()){
-    _sessionRestored=true;
-    _hideLoading();
-    startApp();
-    // Mettre à jour en arrière-plan depuis Supabase
-    if(window.jbLoad){
-      window.jbLoad(function(data){
-        if(data){
-          Object.keys(data).forEach(function(k){D[k]=data[k];});
-          try{localStorage.setItem("gjm4",JSON.stringify(D));}catch(e){}
-          if(window.rMtbl)window.rMtbl();
-          if(window.rMsgs)window.rMsgs();
-          if(window.rNews)window.rNews();
-          if(window.updSt)window.updSt();
-          if(window.updHomeNf)window.updHomeNf();
-        }
-      });
-    }
-    return;
-  }
-  // 2. Essayer avec données Supabase
+  // Charger les données depuis Supabase en arrière-plan
   if(window.jbLoad){
     var _timeout=setTimeout(function(){
+      // Timeout : charger depuis localStorage et afficher login
       _hideLoading();showLogin();
     },6000);
     window.jbLoad(function(data){
@@ -1494,13 +1474,11 @@ function _doRestore(){
         try{localStorage.setItem("gjm4",JSON.stringify(D));}catch(e){}
       }
       _hideLoading();
-      if(!_sessionRestored&&restoreSession()){
-        _sessionRestored=true;startApp();
-      } else {
-        showLogin();
-      }
+      // Toujours afficher la page connexion - ne pas restaurer automatiquement
+      showLogin();
     });
   } else {
+    // Pas de Supabase - afficher login avec données locales
     _hideLoading();showLogin();
   }
 }
