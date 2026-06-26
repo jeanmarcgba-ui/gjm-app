@@ -5,117 +5,118 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Application GJM</title>
 <script>
-// ── JSONBin.io — Synchronisation multi-utilisateurs ──────────
-var JB_KEY="$2a$10$zIlrKsy/hIaO8q2dpctsEuymZzKaD.CrumIgwd9aPcOUCQIS99lwC";
-var JB_BIN="6a3cf35ea8b6024c76259d46";
-var JB_URL="https://api.jsonbin.io/v3/b/"+JB_BIN;
-var _jbSaving=false,_jbDirty=false,_jbLastSig="";
+// ── Supabase — Synchronisation multi-utilisateurs ─────────────
+var SB_URL="https://rbnsymxybhihspknfqdb.supabase.co";
+var SB_KEY="sb_publishable_F0GVlsQeKnCyKs5DWYgWKg_H6pYhZ4M";
+var SB_TABLE="gjm_data";
+var SB_API=SB_URL+"/rest/v1/"+SB_TABLE;
+var _sbSaving=false,_sbDirty=false,_sbLastSig="";
 
-// ── Générer une signature unique des données ─────────────────
+// ── Signature pour détecter les changements ───────────────────
 function _jbSig(d){
-  // Signature incluant TOUS les elements dont les comptes utilisateurs
   try{
-    var s=(d.mb?d.mb.length:0)+"_"
-         +(d.us?d.us.length:0)+"_"      // comptes utilisateurs
-         +(d.ct?d.ct.length:0)+"_"
-         +(d.kp?d.kp.length:0)+"_"
-         +(d.dn?d.dn.length:0)+"_"
-         +(d.nw?d.nw.length:0)+"_"
-         +(d.ev?d.ev.length:0)+"_"
-         +(d.ms?d.ms.length:0)+"_"
-         +(d.nf?d.nf.length:0)+"_"
-         +(d.cmd?d.cmd.length:0)+"_"
-         +(d.sh?d.sh.length:0)+"_"
-         +(d.gl?d.gl.length:0)+"_"
-         +(d.payhist?d.payhist.length:0)+"_"
-         +(d.an||"")+"_"                // nom association
-         +(d.logo?"1":"0");             // logo présent ou non
-    return s;
+    return (d.mb?d.mb.length:0)+"_"
+          +(d.us?d.us.length:0)+"_"
+          +(d.ct?d.ct.length:0)+"_"
+          +(d.kp?d.kp.length:0)+"_"
+          +(d.dn?d.dn.length:0)+"_"
+          +(d.nw?d.nw.length:0)+"_"
+          +(d.ev?d.ev.length:0)+"_"
+          +(d.ms?d.ms.length:0)+"_"
+          +(d.nf?d.nf.length:0)+"_"
+          +(d.cmd?d.cmd.length:0)+"_"
+          +(d.sh?d.sh.length:0)+"_"
+          +(d.gl?d.gl.length:0)+"_"
+          +(d.payhist?d.payhist.length:0)+"_"
+          +(d.an||"")+"_"
+          +(d.logo?"1":"0");
   }catch(e){return "";}
 }
 
-// ── Sauvegarder sur JSONBin (debounce 1.5s) ──────────────────
-var _jbTimer=null;
-window.jbSave=function(data){
-  clearTimeout(_jbTimer);
-  _jbTimer=setTimeout(function(){_jbDoSave(data);},1500);
-};
-function _jbDoSave(data){
-  if(_jbSaving){_jbDirty=true;return;}
-  _jbSaving=true;
-  _jbSetStatus("&#9729; Sync...","#fff3cd","#856404");
-  try{
-    fetch(JB_URL,{
-      method:"PUT",
-      headers:{
-        "Content-Type":"application/json",
-        "X-Master-Key":JB_KEY
-      },
-      body:JSON.stringify(data)
-    }).then(function(r){
-      _jbSaving=false;
-      if(r.ok){
-        _jbLastSig=_jbSig(data);
-        _jbSetStatus("&#128994; Sync","#d4edda","#155724");
-        if(_jbDirty){_jbDirty=false;_jbDoSave(window.D);}
-      } else {
-        _jbSetStatus("&#9888; Erreur","#fff3cd","#856404");
-      }
-    }).catch(function(){
-      _jbSaving=false;
-      _jbSetStatus("&#128245; Hors ligne","#f8d7da","#721c24");
-    });
-  }catch(e){_jbSaving=false;}
+function _sbHeaders(extra){
+  var h={"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json"};
+  if(extra)Object.assign(h,extra);
+  return h;
+}
+function _jbSetStatus(txt,bg,color){
+  var s=document.getElementById("fb-status");
+  if(s){s.textContent=txt;s.style.background=bg;s.style.color=color;}
+  var cs=document.getElementById("cloud-sync-status");
+  if(cs){cs.textContent=txt;cs.style.background=bg;cs.style.color=color;}
 }
 
-// ── Charger depuis JSONBin ────────────────────────────────────
-window.jbLoad=function(cb){
-  // GET sans Content-Type pour eviter le preflight CORS
-  fetch(JB_URL+"/latest",{
-    method:"GET",
-    headers:{
-      "X-Master-Key":JB_KEY,
-      "X-Bin-Meta":"false"
+// ── Sauvegarder sur Supabase ──────────────────────────────────
+var _sbTimer=null;
+window.jbSave=function(data){
+  clearTimeout(_sbTimer);
+  _sbTimer=setTimeout(function(){_sbDoSave(data);},1500);
+};
+function _sbDoSave(data){
+  if(_sbSaving){_sbDirty=true;return;}
+  _sbSaving=true;
+  _jbSetStatus("&#9729; Sync...","#fff3cd","#856404");
+  var payload=JSON.stringify(data);
+  // Upsert : mettre à jour la ligne id=1 ou la créer
+  fetch(SB_API,{
+    method:"POST",
+    headers:Object.assign(_sbHeaders(),{"Prefer":"resolution=merge-duplicates"}),
+    body:JSON.stringify({id:1,payload:payload})
+  }).then(function(r){
+    _sbSaving=false;
+    if(r.ok||r.status===201||r.status===204){
+      _sbLastSig=_jbSig(data);
+      _jbSetStatus("&#128994; Sync","#d4edda","#155724");
+      if(_sbDirty){_sbDirty=false;_sbDoSave(window.D);}
+    } else {
+      r.text().then(function(t){console.warn("Supabase save error:",r.status,t);});
+      _jbSetStatus("&#9888; Erreur","#fff3cd","#856404");
     }
-  })
-  .then(function(r){
+  }).catch(function(e){
+    _sbSaving=false;
+    console.warn("Supabase save catch:",e);
+    _jbSetStatus("&#128245; Hors ligne","#f8d7da","#721c24");
+  });
+}
+
+// ── Charger depuis Supabase ───────────────────────────────────
+window.jbLoad=function(cb){
+  fetch(SB_API+"?id=eq.1&select=payload",{
+    method:"GET",
+    headers:_sbHeaders()
+  }).then(function(r){
     if(!r.ok)throw new Error("HTTP "+r.status);
     return r.json();
-  })
-  .then(function(d){
-    if(!d||typeof d!=="object")return;
-    var data=d.record||d;
+  }).then(function(rows){
+    if(!rows||!rows.length||!rows[0].payload)return;
+    var data=JSON.parse(rows[0].payload);
     if(!data||typeof data!=="object")return;
-    if(data.message&&typeof data.message==="string")return;
-    if(!data.us&&!data.mb&&!data.an)return;
-    _jbLastSig=_jbSig(data);
+    _sbLastSig=_jbSig(data);
     cb(data);
-  })
-  .catch(function(e){
-    console.warn("jbLoad erreur:",e.message||e);
+  }).catch(function(e){
+    console.warn("Supabase load erreur:",e.message||e);
   });
 };
 
-// ── Synchronisation automatique toutes les 5 secondes ────────
+// ── Synchronisation temps réel toutes les 5 secondes ─────────
 window.jbStartSync=function(){
   setInterval(function(){
-    if(!window.D||_jbSaving)return;
-    fetch(JB_URL+"/latest",{
+    if(!window.D||_sbSaving)return;
+    fetch(SB_API+"?id=eq.1&select=payload",{
       method:"GET",
-      headers:{"X-Master-Key":JB_KEY,"X-Bin-Meta":"false"}
-    }).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.json();})
-    .then(function(d){
-      if(!d||typeof d!=="object")return;
-      var d=d.record||d; // JSONBin v3
-      if(!d||(!d.us&&!d.mb)||d.message)return;
-      var newSig=_jbSig(d);
-      if(newSig===_jbLastSig)return; // Aucun changement
-      _jbLastSig=newSig;
-      // Appliquer les nouvelles données
+      headers:_sbHeaders()
+    }).then(function(r){
+      if(!r.ok)throw new Error("HTTP "+r.status);
+      return r.json();
+    }).then(function(rows){
+      if(!rows||!rows.length||!rows[0].payload)return;
+      var data=JSON.parse(rows[0].payload);
+      if(!data||typeof data!=="object")return;
+      var newSig=_jbSig(data);
+      if(newSig===_sbLastSig)return;
+      _sbLastSig=newSig;
       var before=JSON.stringify(window.D);
-      Object.keys(d).forEach(function(k){window.D[k]=d[k];});
+      Object.keys(data).forEach(function(k){window.D[k]=data[k];});
       try{localStorage.setItem("gjm4",JSON.stringify(window.D));}catch(e){}
-      // Rafraîchir toute l'UI si changement réel
       if(JSON.stringify(window.D)!==before){
         if(typeof rMtbl==="function")rMtbl();
         if(typeof rUtbl==="function")rUtbl();
@@ -141,14 +142,6 @@ window.jbStartSync=function(){
     });
   },5000);
 };
-
-function _jbSetStatus(txt,bg,color){
-  var s=document.getElementById("fb-status");
-  if(s){s.textContent=txt;s.style.background=bg;s.style.color=color;}
-  // Mettre à jour aussi le statut cloud dans Options
-  var cs=document.getElementById("cloud-sync-status");
-  if(cs){cs.textContent=txt;cs.style.background=bg;cs.style.color=color;}
-}
 </script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
