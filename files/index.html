@@ -5,85 +5,75 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Application GJM</title>
 <script>
-// ── Supabase — Synchronisation multi-utilisateurs ─────────────
+// ── Supabase — Synchronisation temps réel ────────────────────
 var SB_URL="https://rbnsymxybhihspknfqdb.supabase.co";
 var SB_KEY="sb_publishable_F0GVlsQeKnCyKs5DWYgWKg_H6pYhZ4M";
-var SB_TABLE="gjm_data";
-var SB_API=SB_URL+"/rest/v1/"+SB_TABLE;
-var _sbSaving=false,_sbDirty=false,_sbLastSig="";
+var SB_API=SB_URL+"/rest/v1/gjm_data";
+var _sbLastSig="",_sbLastTs="",_sbSaveTimer=null,_sbBusy=false;
 
-// ── Signature pour détecter les changements ───────────────────
+function _sbH(){return{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json"};}
+
 function _jbSig(d){
   try{
-    return (d.mb?d.mb.length:0)+"_"
-          +(d.us?d.us.length:0)+"_"
-          +(d.ct?d.ct.length:0)+"_"
-          +(d.kp?d.kp.length:0)+"_"
-          +(d.dn?d.dn.length:0)+"_"
-          +(d.nw?d.nw.length:0)+"_"
-          +(d.ev?d.ev.length:0)+"_"
-          +(d.ms?d.ms.length:0)+"_"
-          +(d.nf?d.nf.length:0)+"_"
-          +(d.cmd?d.cmd.length:0)+"_"
-          +(d.sh?d.sh.length:0)+"_"
-          +(d.gl?d.gl.length:0)+"_"
-          +(d.payhist?d.payhist.length:0)+"_"
-          +(d.an||"")+"_"
-          +(d.logo?"1":"0");
+    // Compter uniquement les vrais messages (pas les signaux d'appel)
+    var msCount=0;
+    if(d.ms)d.ms.forEach(function(m){if(!m.signal)msCount++;});
+    return (d.mb?d.mb.length:0)+"_"+(d.us?d.us.length:0)+"_"+(d.ct?d.ct.length:0)+"_"
+          +(d.kp?d.kp.length:0)+"_"+(d.dn?d.dn.length:0)+"_"+(d.nw?d.nw.length:0)+"_"
+          +(d.ev?d.ev.length:0)+"_"+msCount+"_"+(d.nf?d.nf.length:0)+"_"
+          +(d.cmd?d.cmd.length:0)+"_"+(d.sh?d.sh.length:0)+"_"+(d.gl?d.gl.length:0)+"_"
+          +(d.payhist?d.payhist.length:0)+"_"+(d.an||"")+"_"+(d.logo?"1":"0");
   }catch(e){return "";}
 }
 
-function _sbHeaders(extra){
-  var h={"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json"};
-  if(extra)Object.assign(h,extra);
-  return h;
-}
-function _jbSetStatus(txt,bg,color){
+function _jbSetStatus(txt,bg,col){
   var s=document.getElementById("fb-status");
-  if(s){s.textContent=txt;s.style.background=bg;s.style.color=color;}
+  if(s){s.textContent=txt;s.style.background=bg;s.style.color=col;}
   var cs=document.getElementById("cloud-sync-status");
-  if(cs){cs.textContent=txt;cs.style.background=bg;cs.style.color=color;}
+  if(cs){cs.textContent=txt;cs.style.background=bg;cs.style.color=col;}
 }
 
-// ── Sauvegarder sur Supabase ──────────────────────────────────
-var _sbTimer=null;
-window.jbSave=function(data){
-  clearTimeout(_sbTimer);
-  _sbTimer=setTimeout(function(){_sbDoSave(data);},1500);
-};
-window._sbDoSave=function(data){_sbDoSave(data);};
-function _sbDoSave(data){
-  if(_sbSaving){_sbDirty=true;return;}
-  _sbSaving=true;
-  _jbSetStatus("&#9729; Sync...","#fff3cd","#856404");
-  var payload=JSON.stringify(data);
-  // Upsert : mettre à jour la ligne id=1 ou la créer
+// ── SAUVEGARDER sur Supabase ──────────────────────────────────
+function _sbWrite(data,cb){
   fetch(SB_API,{
     method:"POST",
-    headers:Object.assign(_sbHeaders(),{"Prefer":"resolution=merge-duplicates"}),
-    body:JSON.stringify({id:1,payload:payload})
+    headers:Object.assign(_sbH(),{"Prefer":"resolution=merge-duplicates"}),
+    body:JSON.stringify({id:1,payload:JSON.stringify(data),updated_at:new Date().toISOString()})
   }).then(function(r){
-    _sbSaving=false;
     if(r.ok||r.status===201||r.status===204){
       _sbLastSig=_jbSig(data);
       _jbSetStatus("&#128994; Sync","#d4edda","#155724");
-      if(_sbDirty){_sbDirty=false;_sbDoSave(window.D);}
+      if(cb)cb(true);
     } else {
-      r.text().then(function(t){console.warn("Supabase save error:",r.status,t);});
       _jbSetStatus("&#9888; Erreur","#fff3cd","#856404");
+      if(cb)cb(false);
     }
-  }).catch(function(e){
-    _sbSaving=false;
-    console.warn("Supabase save catch:",e);
+  }).catch(function(){
     _jbSetStatus("&#128245; Hors ligne","#f8d7da","#721c24");
+    if(cb)cb(false);
   });
 }
 
-// ── Charger depuis Supabase ───────────────────────────────────
+// Sauvegarde avec debounce 800ms
+window.jbSave=function(data){
+  clearTimeout(_sbSaveTimer);
+  _sbSaveTimer=setTimeout(function(){
+    _sbLastSig=""; // forcer la re-sync chez les autres
+    _sbWrite(data);
+  },800);
+};
+
+// Sauvegarde IMMÉDIATE
+window._sbDoSave=function(data){
+  clearTimeout(_sbSaveTimer);
+  _jbSetStatus("&#9729; Envoi...","#fff3cd","#856404");
+  _sbWrite(data);
+};
+
+// ── CHARGER depuis Supabase ───────────────────────────────────
 window.jbLoad=function(cb){
-  fetch(SB_API+"?id=eq.1&select=payload",{
-    method:"GET",
-    headers:_sbHeaders()
+  fetch(SB_API+"?id=eq.1&select=payload,updated_at",{
+    headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY}
   }).then(function(r){
     if(!r.ok)throw new Error("HTTP "+r.status);
     return r.json();
@@ -93,56 +83,124 @@ window.jbLoad=function(cb){
     if(!data||typeof data!=="object")return;
     _sbLastSig=_jbSig(data);
     cb(data);
-  }).catch(function(e){
-    console.warn("Supabase load erreur:",e.message||e);
-  });
+  }).catch(function(e){console.warn("Supabase load:",e.message);});
 };
 
-// ── Synchronisation temps réel toutes les 5 secondes ─────────
+// ── SYNC toutes les 2 secondes ────────────────────────────────
+// Fonction de sync exposée globalement
+function _doSync(force){
+  fetch(SB_API+"?id=eq.1&select=payload,updated_at",{
+    headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY}
+  }).then(function(r){
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    return r.json();
+  }).then(function(rows){
+    if(!rows||!rows.length||!rows[0].payload)return;
+    var data=JSON.parse(rows[0].payload);
+    if(!data||typeof data!=="object")return;
+    var newSig=_jbSig(data);
+    var newTs=(rows[0].updated_at||"");
+    // Si force=true, toujours appliquer
+    if(!force&&newSig===_sbLastSig&&newTs===_sbLastTs)return;
+    _sbLastSig=newSig;
+    _sbLastTs=newTs;
+    // Appliquer les nouvelles données
+    Object.keys(data).forEach(function(k){window.D[k]=data[k];});
+    try{localStorage.setItem("gjm4",JSON.stringify(window.D));}catch(e){}
+    // Rafraîchir TOUTE l'UI
+    if(typeof rMtbl==="function")rMtbl();
+    if(typeof rUtbl==="function")rUtbl();
+    if(typeof rKtbl==="function")rKtbl();
+    // Ne pas rafraîchir les notifications si on est en train de les lire
+    var ntfPage=document.getElementById("pg-ntf");
+    if(typeof rNflst==="function"&&ntfPage&&ntfPage.classList.contains("act"))rNflst();
+    if(typeof updHomeNf==="function")updHomeNf(); // toujours mettre à jour l'accueil
+    if(typeof rNews==="function")rNews();
+    if(typeof rDtbl==="function")rDtbl();
+    if(typeof rCtbl==="function")rCtbl();
+    // Rafraîchir les messages seulement si le champ de saisie est vide
+    var cinp=document.getElementById("cinp");
+    if(typeof rMsgs==="function"&&(!cinp||!cinp.value.trim()))rMsgs();
+    if(window.rShop)window.rShop();
+    if(typeof rGal==="function")rGal();
+    if(window.rPayHistory)window.rPayHistory();
+    if(typeof updUI==="function")updUI();
+    if(typeof updSt==="function")updSt();
+    if(typeof updHomeNf==="function")updHomeNf();
+    if(typeof rCcont==="function")rCcont();
+    if(typeof rEvlst==="function")rEvlst();
+    if(window._updBadges)window._updBadges();
+    if(force){
+      _jbSetStatus("&#128994; Sync","#d4edda","#155724");
+      if(window.ntf)window.ntf("Application actualisee !","ok");
+    } else {
+      _jbSetStatus("&#128260; Mis a jour","#d4edda","#155724");
+      setTimeout(function(){_jbSetStatus("&#128994; Sync","#d4edda","#155724");},2000);
+    }
+  }).catch(function(){
+    _jbSetStatus("&#128245; Hors ligne","#f8d7da","#721c24");
+  });
+}
+
 window.jbStartSync=function(){
-  setInterval(function(){
-    if(!window.D||_sbSaving)return;
-    fetch(SB_API+"?id=eq.1&select=payload",{
-      method:"GET",
-      headers:_sbHeaders()
-    }).then(function(r){
-      if(!r.ok)throw new Error("HTTP "+r.status);
-      return r.json();
-    }).then(function(rows){
-      if(!rows||!rows.length||!rows[0].payload)return;
-      var data=JSON.parse(rows[0].payload);
-      if(!data||typeof data!=="object")return;
-      var newSig=_jbSig(data);
-      if(newSig===_sbLastSig)return;
-      _sbLastSig=newSig;
-      var before=JSON.stringify(window.D);
+  // Sync toutes les 2 secondes
+  setInterval(function(){_doSync(false);},2000);
+  _doSync(false); // première sync immédiate
+};
+
+// Bouton Actualiser — recharge les données sans déconnecter ni recharger la page
+window.forceSync=function(){
+  var btn=document.getElementById("refresh-btn");
+  if(btn){btn.innerHTML="&#9203;";btn.disabled=true;}
+  _jbSetStatus("&#9729; Actualisation...","#fff3cd","#856404");
+
+  function applyAndRefresh(data){
+    if(data){
       Object.keys(data).forEach(function(k){window.D[k]=data[k];});
       try{localStorage.setItem("gjm4",JSON.stringify(window.D));}catch(e){}
-      if(JSON.stringify(window.D)!==before){
-        if(typeof rMtbl==="function")rMtbl();
-        if(typeof rUtbl==="function")rUtbl();
-        if(typeof rKtbl==="function")rKtbl();
-        if(typeof rNflst==="function")rNflst();
-        if(typeof rNews==="function")rNews();
-        if(typeof rDtbl==="function")rDtbl();
-        if(typeof rCtbl==="function")rCtbl();
-        if(typeof rMsgs==="function")rMsgs();
-        if(window.rShop)window.rShop();
-        if(typeof rGal==="function")rGal();
-        if(window.rPayHistory)window.rPayHistory();
-        if(typeof updUI==="function")updUI();
-        if(typeof updSt==="function")updSt();
-        if(typeof updHomeNf==="function")updHomeNf();
-        if(typeof rCcont==="function")rCcont();
-        if(typeof rEvlst==="function")rEvlst();
-        if(window._updBadges)window._updBadges();
-        _jbSetStatus("&#128260; Mis a jour","#d4edda","#155724");
-        setTimeout(function(){_jbSetStatus("&#128994; Sync","#d4edda","#155724");},3000);
-      }
-    }).catch(function(){
-      _jbSetStatus("&#128245; Hors ligne","#f8d7da","#721c24");
+    }
+    // Rafraîchir toute l'UI sans déconnecter
+    if(typeof rMtbl==="function")rMtbl();
+    if(typeof rUtbl==="function")rUtbl();
+    if(typeof rKtbl==="function")rKtbl();
+    if(typeof rNflst==="function")rNflst();
+    if(typeof rNews==="function")rNews();
+    if(typeof rDtbl==="function")rDtbl();
+    if(typeof rCtbl==="function")rCtbl();
+    if(typeof rMsgs==="function")rMsgs();
+    if(window.rShop)window.rShop();
+    if(typeof rGal==="function")rGal();
+    if(window.rPayHistory)window.rPayHistory();
+    if(typeof updUI==="function")updUI();
+    if(typeof updSt==="function")updSt();
+    if(typeof updHomeNf==="function")updHomeNf();
+    if(typeof rCcont==="function")rCcont();
+    if(typeof rEvlst==="function")rEvlst();
+    // Remettre le bouton
+    if(btn){btn.innerHTML="&#128260;";btn.disabled=false;}
+    _jbSetStatus("&#128994; Sync","#d4edda","#155724");
+    if(window.ntf)window.ntf("Application actualisee !","ok");
+  }
+
+  // Charger les données fraîches depuis Supabase
+  if(window.jbLoad){
+    var done=false;
+    window.jbLoad(function(data){
+      done=true;
+      _sbLastSig="";_sbLastTs="";
+      applyAndRefresh(data);
     });
-  },3000);
+    // Timeout 5s : si Supabase ne répond pas, rafraîchir quand même avec données locales
+    setTimeout(function(){
+      if(!done){
+        if(btn){btn.innerHTML="&#128260;";btn.disabled=false;}
+        applyAndRefresh(null);
+        if(window.ntf)window.ntf("Actualise depuis les donnees locales","");
+      }
+    },5000);
+  } else {
+    applyAndRefresh(null);
+  }
 };
 </script>
 
@@ -410,6 +468,8 @@ tr:hover td{background:var(--gc);}
       <div class="bt"><h2 id="hname">Association GJM</h2><span>Systeme de Gestion</span></div>
     </div>
     <div class="hr">
+     
+      <button onclick="forceSync()" title="Actualiser" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.15);color:#fff;border:none;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center" id="refresh-btn">&#128260;</button>
       <div class="ubadge"><div class="dot"></div><span id="cusr">-</span></div>
       <button class="blg" id="logoutbtn">Deconnexion</button>
     </div>
@@ -462,6 +522,16 @@ tr:hover td{background:var(--gc);}
           <div class="sc"><div class="si sv">&#128197;</div><div><div class="sval" id="ste">0</div><div class="slbl">Evenements</div></div></div>
           <div class="sc"><div class="si sr">&#127873;</div><div><div class="sval" id="std">0 F</div><div class="slbl">Dons</div></div></div>
         </div>
+        <!-- Bouton activer notifications -->
+        <div id="notif-ask-panel" style="margin-bottom:16px;background:#fff8e1;border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px;border:1.5px solid #f0c040">
+          <span style="font-size:1.5rem">🔔</span>
+          <div style="flex:1">
+            <div style="font-weight:700;color:var(--b);font-size:.88rem">Activer les notifications</div>
+            <div style="font-size:.75rem;color:#778">Recevez des alertes meme quand l'app est fermee</div>
+          </div>
+          <button onclick="activerNotifs()" class="btn bp bsm" style="flex-shrink:0">Activer</button>
+        </div>
+
         <!-- Notifications sur la page d'accueil -->
         <div id="home-nf-panel" style="margin-bottom:20px;display:none;background:#1a3a6e;border-radius:16px;padding:18px 20px">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
@@ -640,19 +710,76 @@ tr:hover td{background:var(--gc);}
             <div class="cmain">
               <div class="chat-hdr">
                 <div class="chat-hdr-av" id="chat-hdr-av">GG</div>
-                <div>
+                <div style="flex:1">
                   <div style="font-weight:700;color:var(--b);font-size:.95rem" id="ctitle">Groupe General</div>
                   <div style="font-size:.72rem;color:#99a" id="chat-sub">Discussion de groupe</div>
+                </div>
+                <div style="display:flex;gap:8px">
+                  <button id="call-audio-btn" title="Appel audio" style="width:38px;height:38px;border-radius:50%;background:#27ae60;color:#fff;border:none;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center">&#128222;</button>
+                  <button id="call-video-btn" title="Appel video" style="width:38px;height:38px;border-radius:50%;background:var(--b);color:#fff;border:none;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center">&#128249;</button>
+                  <button id="call-members-btn" title="Appeler un membre" style="width:38px;height:38px;border-radius:50%;background:var(--o);color:#fff;border:none;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center">&#128100;</button>
                 </div>
               </div>
               <div class="cmsgs" id="cmsgs"></div>
               <div class="cin">
+                <button id="chat-audio-btn" title="Message vocal" style="border-radius:50%;width:38px;height:38px;padding:0;background:#e74c3c;color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0">&#127908;</button>
+                <input type="file" id="chat-file-input" accept="audio/*,video/*,image/*" style="display:none">
+                <button id="chat-attach-btn" title="Fichier audio/video/image" style="border-radius:50%;width:38px;height:38px;padding:0;background:#6c5ce7;color:#fff;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0">&#128206;</button>
                 <input type="text" id="cinp" placeholder="Ecrire un message...">
-                <button class="btn bp" id="sendbtn" title="Envoyer">&#10148;</button>
+                <button class="btn bp" id="sendbtn" title="Envoyer" style="border-radius:50%;width:42px;height:42px;padding:0;flex-shrink:0">&#10148;</button>
               </div>
             </div>
           </div>
         </div>
+        <!-- Modal sélection membre à appeler -->
+        <div id="call-select-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:99997;align-items:center;justify-content:center">
+          <div style="background:#fff;border-radius:18px;padding:24px;width:380px;max-width:95vw;max-height:80vh;overflow-y:auto">
+            <div style="font-weight:700;color:var(--b);font-size:1.05rem;margin-bottom:16px">&#128100; Appeler un membre</div>
+            <input type="text" id="call-member-search" placeholder="Rechercher un membre..." style="width:100%;padding:10px;border:2px solid var(--g);border-radius:10px;font-size:.9rem;margin-bottom:14px;box-sizing:border-box">
+            <div id="call-member-list" style="display:flex;flex-direction:column;gap:8px"></div>
+            <button onclick="document.getElementById('call-select-modal').style.display='none'" class="btn" style="background:var(--g);width:100%;margin-top:14px">Fermer</button>
+          </div>
+        </div>
+
+        <!-- Modal Appel Audio/Video -->
+        <div id="call-modal" style="display:none;position:fixed;inset:0;background:rgba(10,20,40,.95);z-index:99999;flex-direction:column;align-items:center;justify-content:center">
+          <!-- Vidéos -->
+          <div style="position:relative;width:100%;max-width:600px;margin-bottom:16px">
+            <video id="call-remote-video" autoplay playsinline style="width:100%;border-radius:16px;background:#111;min-height:300px;display:block"></video>
+            <video id="call-local-video" autoplay playsinline muted style="position:absolute;bottom:12px;right:12px;width:120px;border-radius:10px;border:2px solid #fff;background:#222"></video>
+          </div>
+          <!-- Info appel -->
+          <div style="color:#fff;text-align:center;margin-bottom:20px">
+            <div id="call-avatar" style="width:80px;height:80px;border-radius:50%;background:var(--o);display:flex;align-items:center;justify-content:center;font-size:2rem;font-weight:700;color:#fff;margin:0 auto 12px"></div>
+            <div id="call-name" style="font-size:1.3rem;font-weight:700;margin-bottom:6px"></div>
+            <div id="call-status" style="font-size:.9rem;color:rgba(255,255,255,.7)">Appel en cours...</div>
+            <div id="call-timer" style="font-size:1rem;color:#27ae60;font-weight:600;margin-top:4px">00:00</div>
+          </div>
+          <!-- Contrôles -->
+          <div style="display:flex;gap:20px;align-items:center">
+            <button id="call-mute-btn" title="Couper micro" style="width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.15);color:#fff;border:none;cursor:pointer;font-size:1.3rem">&#128263;</button>
+            <button id="call-end-btn" title="Raccrocher" style="width:64px;height:64px;border-radius:50%;background:#e74c3c;color:#fff;border:none;cursor:pointer;font-size:1.5rem">&#128222;</button>
+            <button id="call-cam-btn" title="Camera" style="width:52px;height:52px;border-radius:50%;background:rgba(255,255,255,.15);color:#fff;border:none;cursor:pointer;font-size:1.3rem">&#128249;</button>
+          </div>
+        </div>
+
+        <!-- Modal Appel entrant -->
+        <div id="incoming-call-modal" style="display:none;position:fixed;inset:0;background:rgba(10,20,40,.9);z-index:99998;flex-direction:column;align-items:center;justify-content:center">
+          <div id="incoming-avatar" style="width:100px;height:100px;border-radius:50%;background:var(--o);display:flex;align-items:center;justify-content:center;font-size:2.5rem;font-weight:700;color:#fff;margin-bottom:16px"></div>
+          <div id="incoming-name" style="color:#fff;font-size:1.4rem;font-weight:700;margin-bottom:8px"></div>
+          <div id="incoming-type" style="color:rgba(255,255,255,.7);font-size:1rem;margin-bottom:32px"></div>
+          <div style="display:flex;gap:40px">
+            <div style="text-align:center">
+              <button id="incoming-reject" style="width:64px;height:64px;border-radius:50%;background:#e74c3c;color:#fff;border:none;cursor:pointer;font-size:1.5rem;display:block;margin:0 auto 8px">&#128222;</button>
+              <span style="color:#fff;font-size:.8rem">Refuser</span>
+            </div>
+            <div style="text-align:center">
+              <button id="incoming-accept" style="width:64px;height:64px;border-radius:50%;background:#27ae60;color:#fff;border:none;cursor:pointer;font-size:1.5rem;display:block;margin:0 auto 8px">&#128222;</button>
+              <span style="color:#fff;font-size:.8rem">Accepter</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Modal modifier message -->
         <div id="msg-edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;align-items:center;justify-content:center">
           <div style="background:#fff;border-radius:16px;padding:24px;width:400px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.3)">
@@ -1278,6 +1405,24 @@ function ld(){
 ld();
 var CU=null,cy=new Date().getFullYear(),cm=new Date().getMonth(),curC="Groupe";
 
+// Restaurer la session au rechargement (sans mot de passe)
+function restoreSession(){
+  try{
+    var sess=localStorage.getItem("gjm_session");
+    if(!sess)return false;
+    var f=JSON.parse(sess);
+    if(!f||!f.u)return false;
+    // Chercher l'utilisateur dans D.us
+    for(var i=0;i<D.us.length;i++){
+      if(D.us[i].u===f.u){
+        CU=D.us[i];window.CU=CU;
+        return true;
+      }
+    }
+  }catch(e){}
+  return false;
+}
+
 function isExp(){if(!D.exp)return false;return new Date()>new Date(D.exp);}
 function chkBlock(){
   if(D.exp&&isExp()){
@@ -1287,6 +1432,28 @@ function chkBlock(){
   }
   return false;
 }
+// Tenter de restaurer la session au chargement
+setTimeout(function(){
+  if(window.jbLoad){
+    // Charger d'abord les données fraîches depuis Supabase
+    window.jbLoad(function(data){
+      if(data){
+        Object.keys(data).forEach(function(k){D[k]=data[k];});
+        try{localStorage.setItem("gjm4",JSON.stringify(D));}catch(e){}
+      }
+      // Puis restaurer la session
+      if(restoreSession()){
+        startApp();
+      }
+    });
+    // Timeout : si Supabase ne répond pas, utiliser les données locales
+    setTimeout(function(){
+      if(!CU&&restoreSession())startApp();
+    },3000);
+  } else {
+    if(restoreSession())startApp();
+  }
+},100);
 
 function q(id){return document.getElementById(id);}
 function gv(id){var el=q(id);return el?el.value:"";}
@@ -1346,7 +1513,10 @@ function doLogin(){
       if(e){e.innerHTML="Identifiants incorrects. Si vous venez d'etre ajoute, attendez 10 secondes et reessayez.";e.style.display="block";setTimeout(function(){e.style.display="none";},6000);}
       return;
     }
-    CU=f;window.CU=CU;startApp();
+    CU=f;window.CU=CU;
+  // Sauvegarder la session pour rechargement sans mot de passe
+  try{localStorage.setItem("gjm_session",JSON.stringify({u:f.u,r:f.r,l:f.l}));}catch(ex){}
+  startApp();
   }
 
   // Toujours charger les données fraîches depuis JSONBin avant de vérifier
@@ -1375,7 +1545,9 @@ function doLogin(){
   }
 }
 q("logoutbtn").addEventListener("click",function(){
-  CU=null;window.CU=null;q("pg-app").style.display="none";q("pg-login").style.display="flex";
+  CU=null;window.CU=null;
+  try{localStorage.removeItem("gjm_session");}catch(e){}
+  q("pg-app").style.display="none";q("pg-login").style.display="flex";
 });
 q("unlbtn").addEventListener("click",function(){
   var k=gv("ukey"),cr=null;
@@ -2072,9 +2244,15 @@ q("cinp").addEventListener("keypress",function(e){if(e.key==="Enter")sendMsg();}
 function sendMsg(){
   var t=gv("cinp").trim();if(!t)return;
   D.ms.push({id:Date.now(),ch:curC,tx:t,au:CU.u,ti:new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}),dt:new Date().toLocaleDateString("fr-FR")});
-  sv();q("cinp").value="";rMsgs();
-  // Forcer sauvegarde immédiate sur Supabase
-  if(window._sbDoSave)window._sbDoSave(D);
+  // Sauvegarder localement
+  try{localStorage.setItem("gjm4",JSON.stringify(D));}catch(e){}
+  q("cinp").value="";rMsgs();
+  // Forcer sauvegarde IMMEDIATE sur Supabase
+  if(window._sbDoSave){
+    window._sbDoSave(D);
+  } else {
+    sv();
+  }
 }
 function rMsgs(){
   var ms=D.ms.filter(function(m){return m.ch===curC;});
@@ -2095,7 +2273,22 @@ function rMsgs(){
     // Bulle message
     html+="<div class='msg "+(s?"s":"r")+"'>";
     if(!s) html+="<div style='font-size:.7rem;font-weight:700;color:var(--b);margin-bottom:3px;padding-left:4px'>"+m.au+"</div>";
-    html+="<div class='mb'>"+(m.edited?"<span style='font-style:italic;opacity:.7;font-size:.8em'>(modifie) </span>":"")+escHtml(m.tx)+"</div>";
+    var msgContent="";
+    if(m.media){
+      if(m.mediaType==="audio"){
+        msgContent="<div style='margin:4px 0'><audio controls src='"+m.media+"' style='max-width:220px;height:36px'></audio>"
+          +"<div style='font-size:.65rem;opacity:.7;margin-top:2px'>&#127908; "+escHtml(m.mediaNom||"Vocal")+"</div></div>";
+      } else if(m.mediaType==="video"){
+        msgContent="<video controls src='"+m.media+"' style='max-width:240px;border-radius:8px;margin:4px 0'></video>"
+          +"<div style='font-size:.65rem;opacity:.7'>&#127909; "+escHtml(m.mediaNom||"Video")+"</div>";
+      } else {
+        msgContent="<img src='"+m.media+"' style='max-width:200px;border-radius:8px;margin:4px 0;cursor:pointer' onclick='window.open(this.src)'>"
+          +"<div style='font-size:.65rem;opacity:.7'>&#128247; "+escHtml(m.mediaNom||"Image")+"</div>";
+      }
+    } else {
+      msgContent=(m.edited?"<span style='font-style:italic;opacity:.7;font-size:.8em'>(modifie) </span>":"")+escHtml(m.tx);
+    }
+    html+="<div class='mb'>"+msgContent+"</div>";
     html+="<div class='mi'>"+m.ti+"</div>";
     // Actions modifier/supprimer pour tous
     html+="<div class='msg-actions'>"
@@ -2126,6 +2319,78 @@ function msgDel(idx){
   D.ms.splice(idx,1);sv();rMsgs();
 }
 window.msgEdit=msgEdit;window.msgDel=msgDel;
+
+// ── Messages vocaux ──────────────────────────────────────────
+var _mediaRec=null,_audioChunks=[],_isRecording=false;
+var audioBtn=document.getElementById("chat-audio-btn");
+if(audioBtn){
+  audioBtn.addEventListener("click",function(){
+    if(!_isRecording){
+      // Démarrer l'enregistrement
+      navigator.mediaDevices.getUserMedia({audio:true}).then(function(stream){
+        _mediaRec=new MediaRecorder(stream);
+        _audioChunks=[];
+        _mediaRec.addEventListener("dataavailable",function(e){_audioChunks.push(e.data);});
+        _mediaRec.addEventListener("stop",function(){
+          var blob=new Blob(_audioChunks,{type:"audio/webm"});
+          var r=new FileReader();
+          r.onload=function(e){
+            sendMediaMsg(e.target.result,"audio","Message vocal");
+          };
+          r.readAsDataURL(blob);
+          stream.getTracks().forEach(function(t){t.stop();});
+        });
+        _mediaRec.start();
+        _isRecording=true;
+        audioBtn.style.background="#c0392b";
+        audioBtn.innerHTML="&#9899;";
+        audioBtn.title="Arreter l'enregistrement";
+        if(window.ntf)window.ntf("Enregistrement en cours...","");
+      }).catch(function(){
+        if(window.ntf)window.ntf("Microphone non disponible","er");
+      });
+    } else {
+      // Arrêter l'enregistrement
+      if(_mediaRec&&_mediaRec.state!=="inactive")_mediaRec.stop();
+      _isRecording=false;
+      audioBtn.style.background="#e74c3c";
+      audioBtn.innerHTML="&#127908;";
+      audioBtn.title="Message vocal";
+    }
+  });
+}
+
+// ── Fichiers audio/vidéo/image ───────────────────────────────
+var attachBtn=document.getElementById("chat-attach-btn");
+var fileInput=document.getElementById("chat-file-input");
+if(attachBtn&&fileInput){
+  attachBtn.addEventListener("click",function(){fileInput.click();});
+  fileInput.addEventListener("change",function(){
+    var f=this.files&&this.files[0];
+    if(!f)return;
+    var MAX=10*1024*1024;
+    if(f.size>MAX){if(window.ntf)window.ntf("Fichier trop lourd (max 10MB)","er");return;}
+    var r=new FileReader();
+    r.onload=function(e){
+      var type=f.type.startsWith("audio")?"audio":f.type.startsWith("video")?"video":"image";
+      sendMediaMsg(e.target.result,type,f.name);
+    };
+    r.readAsDataURL(f);
+    this.value="";
+  });
+}
+
+function sendMediaMsg(data,type,nom){
+  D.ms.push({
+    id:Date.now(),ch:curC,tx:"",media:data,mediaType:type,mediaNom:nom,
+    au:CU.u,ti:new Date().toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"}),
+    dt:new Date().toLocaleDateString("fr-FR")
+  });
+  try{localStorage.setItem("gjm4",JSON.stringify(D));}catch(e){}
+  rMsgs();
+  if(window._sbDoSave)window._sbDoSave(D); else sv();
+  if(window.ntf)window.ntf(type==="audio"?"Message vocal envoye !":"Fichier envoye !","ok");
+}
 function rCcont(){
   var el=q("cconts");if(!el)return;
   var rows="";
@@ -2161,8 +2426,10 @@ q("sendnfbtn").addEventListener("click",function(){
     D.nf.unshift({id:Date.now(),ti:t,ms:m,au:CU.u,dt:new Date().toLocaleDateString("fr-FR")});
     ntf("Notification envoyee!","ok");
   }
-  sv();q("nft").value="";q("nfm").value="";q("ned2").style.display="none";q("nf-edit-id").value="";
+  try{localStorage.setItem("gjm4",JSON.stringify(D));}catch(e){}
+  q("nft").value="";q("nfm").value="";q("ned2").style.display="none";q("nf-edit-id").value="";
   rNflst();updHomeNf();
+  if(window._sbDoSave)window._sbDoSave(D); else sv();
 });
 function rNflst(){
   var l=q("nflst");
@@ -4061,12 +4328,7 @@ window._rNflstFull=function(){if(typeof rNflst==="undefined")return;};
   navigator.serviceWorker.register(swUrl,{scope:'./'})
   .then(function(reg){
     console.log('Service Worker enregistré');
-    // Demander permission notifications
-    if('Notification' in window&&Notification.permission==='default'){
-      Notification.requestPermission().then(function(p){
-        console.log('Notification permission:',p);
-      });
-    }
+    window._swReg=reg;
   })
   .catch(function(e){
     console.warn('SW erreur:',e);
@@ -4182,10 +4444,46 @@ window._rNflstFull=function(){if(typeof rNflst==="undefined")return;};
     }
   };
 
+  // Fonction pour activer les notifications (appelée par le bouton)
+  window.activerNotifs=function(){
+    if(!("Notification" in window)){
+      alert("Votre navigateur ne supporte pas les notifications.");return;
+    }
+    Notification.requestPermission().then(function(permission){
+      var panel=document.getElementById("notif-ask-panel");
+      if(permission==="granted"){
+        if(panel)panel.style.display="none";
+        // Sauvegarder le choix
+        try{localStorage.setItem("gjm_notif","granted");}catch(e){}
+        if(window.ntf)window.ntf("Notifications activees ! Vous recevrez des alertes.","ok");
+        // Tester une notification
+        setTimeout(function(){
+          new Notification("GJM — Notifications activees",{
+            body:"Vous recevrez des alertes pour les messages et actualites.",
+            icon:window.D&&window.D.logo||""
+          });
+        },500);
+      } else {
+        if(window.ntf)window.ntf("Notifications refusees. Vous pouvez les activer dans les parametres du navigateur.","er");
+      }
+    });
+  };
+
+  // Masquer le panel si déjà autorisé
+  function updNotifPanel(){
+    var panel=document.getElementById("notif-ask-panel");
+    if(!panel)return;
+    if(!("Notification" in window)||Notification.permission==="granted"){
+      panel.style.display="none";
+    } else {
+      panel.style.display="flex";
+    }
+  }
+
   // Initialiser quand l'app démarre
   window.addEventListener("load",function(){
     setTimeout(function(){
-      askNotifPermission();
+      updNotifPanel();
       if(window.D){
         _lastMsCount=window.D.ms?window.D.ms.length:0;
         _lastNfCount=window.D.nf?window.D.nf.length:0;
@@ -4196,6 +4494,325 @@ window._rNflstFull=function(){if(typeof rNflst==="undefined")return;};
 
   // Vérifier les nouveaux messages à chaque sync Supabase
   window._updBadges=updBadges;
+
+})();
+</script>
+
+<script>
+// ════════════════════════════════════════════════════════════════
+// APPELS AUDIO / VIDEO — WebRTC via Supabase signaling
+// ════════════════════════════════════════════════════════════════
+(function(){
+  var q=function(id){return document.getElementById(id);};
+  var _pc=null,_localStream=null,_callTimer=null,_callSecs=0;
+  var _isVideo=false,_isMuted=false,_callActive=false;
+  var _callChannel=null,_myId=null;
+
+  // ID unique par session
+  function getMyId(){
+    if(_myId)return _myId;
+    _myId=(window.CU&&window.CU.u)||("user_"+Date.now());
+    return _myId;
+  }
+
+  // ── Signalisation via Supabase (messages dans D.ms) ──────────
+  // On utilise D.ms avec un type spécial "call_signal" pour la signalisation
+  function sendSignal(toUser,data){
+    if(!window.D)return;
+    if(!window.D.ms)window.D.ms=[];
+    window.D.ms.push({
+      id:Date.now(),
+      ch:"__call__",
+      signal:true,
+      from:getMyId(),
+      to:toUser,
+      data:data,
+      dt:new Date().toISOString()
+    });
+    if(window._sbDoSave)window._sbDoSave(window.D);
+  }
+
+  // Écouter les signaux d'appel entrants
+  var _lastSignalCheck=0;
+  function checkCallSignals(){
+    if(!window.D||!window.D.ms)return;
+    var now=Date.now();
+    window.D.ms.forEach(function(m){
+      if(!m.signal||m.to!==getMyId())return;
+      var mTime=new Date(m.dt).getTime();
+      if(mTime<=_lastSignalCheck)return;
+      handleSignal(m.from,m.data);
+    });
+    _lastSignalCheck=now;
+  }
+
+  // Appeler checkCallSignals dans la sync Supabase
+  var origUpdBadges=window._updBadges;
+  window._updBadges=function(){
+    if(origUpdBadges)origUpdBadges();
+    checkCallSignals();
+  };
+
+  // ── WebRTC ────────────────────────────────────────────────────
+  var ICE_SERVERS={iceServers:[
+    {urls:"stun:stun.l.google.com:19302"},
+    {urls:"stun:stun1.l.google.com:19302"},
+    {urls:"stun:stun2.l.google.com:19302"}
+  ]};
+
+  async function startCall(targetUser,isVideo){
+    if(_callActive){if(window.ntf)window.ntf("Appel déjà en cours","er");return;}
+    _isVideo=isVideo;
+    _callActive=true;
+    try{
+      _localStream=await navigator.mediaDevices.getUserMedia({
+        audio:true,video:isVideo
+      });
+    }catch(e){
+      if(window.ntf)window.ntf("Microphone/Camera non disponible","er");
+      _callActive=false;return;
+    }
+    // Afficher vidéo locale
+    var lv=q("call-local-video");
+    if(lv){lv.srcObject=_localStream;lv.style.display=isVideo?"block":"none";}
+    var rv=q("call-remote-video");
+    if(rv){rv.style.display=isVideo?"block":"none";}
+
+    // Créer PeerConnection
+    _pc=new RTCPeerConnection(ICE_SERVERS);
+    _localStream.getTracks().forEach(function(t){_pc.addTrack(t,_localStream);});
+    _pc.ontrack=function(e){
+      if(rv)rv.srcObject=e.streams[0];
+    };
+    _pc.onicecandidate=function(e){
+      if(e.candidate){
+        sendSignal(targetUser,{type:"candidate",candidate:e.candidate});
+      }
+    };
+    // Créer offre
+    var offer=await _pc.createOffer();
+    await _pc.setLocalDescription(offer);
+    sendSignal(targetUser,{type:"offer",offer:offer,isVideo:isVideo,caller:getMyId()});
+
+    // Afficher modal appel
+    showCallModal(targetUser,isVideo,"En attente...");
+  }
+
+  async function handleSignal(from,data){
+    if(!data)return;
+    if(data.type==="offer"&&!_callActive){
+      // Appel entrant
+      showIncomingCall(from,data);
+    } else if(data.type==="answer"&&_pc){
+      await _pc.setRemoteDescription(new RTCSessionDescription(data.answer));
+      updateCallStatus("Appel en cours");
+      startCallTimer();
+    } else if(data.type==="candidate"&&_pc){
+      try{await _pc.addIceCandidate(new RTCIceCandidate(data.candidate));}catch(e){}
+    } else if(data.type==="hangup"){
+      endCall();
+    }
+  }
+
+  async function acceptCall(from,offerData){
+    _isVideo=offerData.isVideo||false;
+    _callActive=true;
+    try{
+      _localStream=await navigator.mediaDevices.getUserMedia({audio:true,video:_isVideo});
+    }catch(e){
+      if(window.ntf)window.ntf("Micro/Camera non disponible","er");return;
+    }
+    var lv=q("call-local-video");
+    if(lv){lv.srcObject=_localStream;lv.style.display=_isVideo?"block":"none";}
+
+    _pc=new RTCPeerConnection(ICE_SERVERS);
+    _localStream.getTracks().forEach(function(t){_pc.addTrack(t,_localStream);});
+    _pc.ontrack=function(e){
+      var rv=q("call-remote-video");if(rv)rv.srcObject=e.streams[0];
+    };
+    _pc.onicecandidate=function(e){
+      if(e.candidate)sendSignal(from,{type:"candidate",candidate:e.candidate});
+    };
+    await _pc.setRemoteDescription(new RTCSessionDescription(offerData.offer));
+    var answer=await _pc.createAnswer();
+    await _pc.setLocalDescription(answer);
+    sendSignal(from,{type:"answer",answer:answer});
+
+    hideIncomingCall();
+    showCallModal(from,_isVideo,"Appel en cours");
+    startCallTimer();
+  }
+
+  function endCall(){
+    _callActive=false;
+    if(_pc){_pc.close();_pc=null;}
+    if(_localStream){_localStream.getTracks().forEach(function(t){t.stop();});_localStream=null;}
+    clearInterval(_callTimer);_callSecs=0;
+    var cm=q("call-modal");if(cm)cm.style.display="none";
+    hideIncomingCall();
+    var rv=q("call-remote-video");if(rv)rv.srcObject=null;
+    var lv=q("call-local-video");if(lv)lv.srcObject=null;
+  }
+
+  // ── Chronomètre ───────────────────────────────────────────────
+  function startCallTimer(){
+    _callSecs=0;
+    clearInterval(_callTimer);
+    _callTimer=setInterval(function(){
+      _callSecs++;
+      var m=Math.floor(_callSecs/60),s=_callSecs%60;
+      var el=q("call-timer");
+      if(el)el.textContent=(m<10?"0"+m:m)+":"+(s<10?"0"+s:s);
+    },1000);
+  }
+
+  // ── UI appel ──────────────────────────────────────────────────
+  function showCallModal(user,isVideo,status){
+    var cm=q("call-modal");if(!cm)return;
+    var ini=user.split(" ").map(function(w){return w[0]||"";}).join("").toUpperCase().substring(0,2);
+    var av=q("call-avatar");if(av)av.textContent=ini;
+    var nm=q("call-name");if(nm)nm.textContent=user;
+    updateCallStatus(status);
+    var rv=q("call-remote-video");
+    var lv=q("call-local-video");
+    if(rv)rv.style.display=isVideo?"block":"none";
+    if(lv)lv.style.display=isVideo?"block":"none";
+    if(!isVideo){
+      // Appel audio : cacher les vidéos
+      if(av)av.style.display="flex";
+    }
+    cm.style.display="flex";
+  }
+  function updateCallStatus(s){var el=q("call-status");if(el)el.textContent=s;}
+
+  function showIncomingCall(from,offerData){
+    var ic=q("incoming-call-modal");if(!ic)return;
+    var ini=from.split(" ").map(function(w){return w[0]||"";}).join("").toUpperCase().substring(0,2);
+    var av=q("incoming-avatar");if(av)av.textContent=ini;
+    var nm=q("incoming-name");if(nm)nm.textContent=from;
+    var tp=q("incoming-type");if(tp)tp.textContent=offerData.isVideo?"Appel video entrant":"Appel audio entrant";
+    ic.style.display="flex";
+    // Stocker les données pour accepter
+    ic._from=from;ic._offerData=offerData;
+    // Sonnerie
+    try{
+      var ctx=new(window.AudioContext||window.webkitAudioContext)();
+      function beep(){var o=ctx.createOscillator();var g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=880;g.gain.setValueAtTime(0,ctx.currentTime);g.gain.linearRampToValueAtTime(0.3,ctx.currentTime+0.1);g.gain.linearRampToValueAtTime(0,ctx.currentTime+0.5);o.start(ctx.currentTime);o.stop(ctx.currentTime+0.5);}
+      beep();setTimeout(beep,700);setTimeout(beep,1400);
+    }catch(e){}
+  }
+  function hideIncomingCall(){var ic=q("incoming-call-modal");if(ic)ic.style.display="none";}
+
+  // ── Boutons ───────────────────────────────────────────────────
+  // Appel direct depuis la conv privée
+  var audioCallBtn=q("call-audio-btn");
+  if(audioCallBtn)audioCallBtn.addEventListener("click",function(){
+    var target=window.curC;
+    if(!target||target==="Groupe"){
+      openCallSelect(false); // Montrer la liste des membres
+    } else {
+      startCall(target,false);
+    }
+  });
+
+  var videoCallBtn=q("call-video-btn");
+  if(videoCallBtn)videoCallBtn.addEventListener("click",function(){
+    var target=window.curC;
+    if(!target||target==="Groupe"){
+      openCallSelect(true); // Montrer la liste des membres
+    } else {
+      startCall(target,true);
+    }
+  });
+
+  // Bouton liste membres
+  var membersCallBtn=q("call-members-btn");
+  if(membersCallBtn)membersCallBtn.addEventListener("click",function(){
+    openCallSelect(null); // Ouvrir directement la liste
+  });
+
+  var _callSelectType=null;
+  function openCallSelect(isVideo){
+    _callSelectType=isVideo;
+    var modal=q("call-select-modal");if(!modal)return;
+    // Toujours construire la liste à jour
+    var D=window.D;
+    if(!D||!D.mb||!D.mb.length){
+      if(window.ntf)window.ntf("Aucun membre dans l'annuaire. Ajoutez des membres d'abord.","er");
+      return;
+    }
+    buildMemberList("");
+    modal.style.display="flex";modal.style.alignItems="center";modal.style.justifyContent="center";
+    setTimeout(function(){var search=q("call-member-search");if(search){search.value="";search.focus();}},100);
+  }
+
+  var searchInp=q("call-member-search");
+  if(searchInp)searchInp.addEventListener("input",function(){buildMemberList(this.value);});
+
+  function buildMemberList(filter){
+    var list=q("call-member-list");if(!list)return;
+    var D=window.D;if(!D||!D.mb)return;
+    var fl=(filter||"").toLowerCase();
+    var members=D.mb.filter(function(m){
+      var nm=(m.pr+" "+m.nm).toLowerCase();
+      return !fl||nm.indexOf(fl)>-1;
+    });
+    if(!members.length){
+      list.innerHTML="<div style='text-align:center;color:#aab;padding:20px'>Aucun membre trouvé</div>";
+      return;
+    }
+    list.innerHTML=members.map(function(m){
+      var nm=m.pr+" "+m.nm;
+      var ini=(m.pr[0]||"")+(m.nm[0]||"");
+      var card="<div style=\"display:flex;align-items:center;gap:12px;padding:10px;border-radius:10px;border:1.5px solid var(--g);cursor:pointer\">"
+        +"<div style=\"width:40px;height:40px;border-radius:50%;background:var(--b);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem\">"+ini.toUpperCase()+"</div>"
+        +"<div style=\"flex:1;font-weight:600;color:var(--b)\">"+nm+"</div>"
+        +"<div style=\"display:flex;gap:6px\">"
+          +"<button onclick=\"startCallMember('"+nm+"',false)\" style=\"width:34px;height:34px;border-radius:50%;background:#27ae60;color:#fff;border:none;cursor:pointer\">&#128222;</button>"
+          +"<button onclick=\"startCallMember('"+nm+"',true)\" style=\"width:34px;height:34px;border-radius:50%;background:var(--b);color:#fff;border:none;cursor:pointer\">&#128249;</button>"
+        +"</div>"
+      +"</div>";
+      return card;
+    }).join("");
+  }
+
+  window.startCallMember=function(memberName,isVideo){
+    var modal=q("call-select-modal");if(modal)modal.style.display="none";
+    startCall(memberName,isVideo);
+  };
+
+  var endBtn=q("call-end-btn");
+  if(endBtn)endBtn.addEventListener("click",function(){
+    if(window.curC)sendSignal(window.curC,{type:"hangup"});
+    endCall();
+  });
+
+  var muteBtn=q("call-mute-btn");
+  if(muteBtn)muteBtn.addEventListener("click",function(){
+    _isMuted=!_isMuted;
+    if(_localStream)_localStream.getAudioTracks().forEach(function(t){t.enabled=!_isMuted;});
+    muteBtn.innerHTML=_isMuted?"&#128264;":"&#128263;";
+    muteBtn.style.background=_isMuted?"#e74c3c":"rgba(255,255,255,.15)";
+  });
+
+  var camBtn=q("call-cam-btn");
+  if(camBtn)camBtn.addEventListener("click",function(){
+    if(_localStream)_localStream.getVideoTracks().forEach(function(t){t.enabled=!t.enabled;});
+    camBtn.style.background=camBtn.style.background.includes("rgba")?"#e74c3c":"rgba(255,255,255,.15)";
+  });
+
+  var acceptBtn=q("incoming-accept");
+  if(acceptBtn)acceptBtn.addEventListener("click",function(){
+    var ic=q("incoming-call-modal");
+    if(ic&&ic._from&&ic._offerData)acceptCall(ic._from,ic._offerData);
+  });
+
+  var rejectBtn=q("incoming-reject");
+  if(rejectBtn)rejectBtn.addEventListener("click",function(){
+    var ic=q("incoming-call-modal");
+    if(ic&&ic._from)sendSignal(ic._from,{type:"hangup"});
+    hideIncomingCall();
+  });
 
 })();
 </script>
