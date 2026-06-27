@@ -621,9 +621,15 @@ tr:hover td{background:var(--gc);}
 <script>
 (function(){
 var D={an:"Association GJM",exp:null,sd:null,mb:[],ct:[],dn:[],kp:[],nw:[],ev:[],dc:[],us:[{u:"Jean Marc",p:"jeanmarcamp",r:"creator",l:"Createur"}],cts:[],py:{or:"",mo:"",mt:"",wa:""},nf:[],ms:[]};
-function sv(){
+function sv(force){
+  // Si expiré et pas créateur/admin : bloquer sauf si force=true (pour changer la date)
+  if(!force&&D.exp&&isExp()&&CU&&CU.r!=="creator"&&CU.r!=="admin"){
+    ntf("Application expiree. Contactez l'administrateur.","er");
+    return false;
+  }
   try{localStorage.setItem("gjm4",JSON.stringify(D));}catch(e){}
   if(window.jbSave)window.jbSave(D);
+  return true;
 }
 function ld(){
   try{var x=localStorage.getItem("gjm4");if(x){var d=JSON.parse(x);Object.keys(d).forEach(function(k){D[k]=d[k];});}}catch(e){}
@@ -642,9 +648,10 @@ var CU=null,cy=new Date().getFullYear(),cm=new Date().getMonth(),curC="Groupe";
 
 function isExp(){if(!D.exp)return false;return new Date()>new Date(D.exp);}
 function chkBlock(){
-  // Ne bloquer QUE si l'admin a explicitement désactivé l'accès
-  // La date d'expiration affiche juste un avertissement
-  return false;
+  // Bloquer seulement si expiré ET pas créateur/admin
+  if(!D.exp||!isExp())return false;
+  if(CU&&(CU.r==="creator"||CU.r==="admin"))return false;
+  return true; // Membres simples bloqués si expiré
 }
 
 function q(id){return document.getElementById(id);}
@@ -738,6 +745,14 @@ q("unlbtn").addEventListener("click",function(){
 });
 
 function startApp(){
+  // Si expiré et membre simple → page bloquée
+  if(D.exp&&isExp()&&CU&&CU.r!=="creator"&&CU.r!=="admin"){
+    q("pg-login").style.display="none";
+    q("pg-app").style.display="none";
+    var b=q("pg-blocked");
+    if(b){b.style.display="flex";b.style.flexDirection="column";b.style.alignItems="center";b.style.justifyContent="center";}
+    return;
+  }
   q("pg-login").style.display="none";
   q("pg-app").style.display="block";
   q("cusr").textContent=CU.u;
@@ -1074,7 +1089,7 @@ q("savoptbtn").addEventListener("click",function(){
   D.sd=q("ostart").value;D.exp=q("oend").value;
   if(!D.py)D.py={};
   D.py.or=q("por").value;D.py.mo=q("pmo").value;D.py.mt=q("pmt").value;D.py.wa=q("pwa").value;
-  sv();updUI();updCd();ntf("Options sauvegardees!","ok");
+  sv(true);updUI();updCd();ntf("Options sauvegardees!","ok");
 });
 q("resetbtn").addEventListener("click",function(){
   if(!confirm("Reinitialiser toutes les donnees?"))return;
