@@ -1108,28 +1108,31 @@ function updCd(){
 }
 updUI();
 
-// MODAL EDIT USER
-q("eu_cancel").addEventListener("click",function(){q("eu_modal").style.display="none";});
-q("eu_modal").addEventListener("click",function(e){if(e.target===this)this.style.display="none";});
-q("eu_save").addEventListener("click",function(){
-  var oldU=q("eu_old").value;
-  var newU=q("eu_u").value.trim();
-  var newP=q("eu_p").value;
-  var newR=q("eu_r").value;
-  if(!newU||!newP){ntf("Identifiant et mot de passe requis!","er");return;}
-  var conflict=D.us.some(function(x){return x.u===newU&&x.u!==oldU;});
-  if(conflict){ntf("Cet identifiant est deja utilise!","er");return;}
-  var rmap={creator:"Createur",admin:"Administrateur",tresorier:"Tresorier",membre:"Membre Simple"};
-  for(var i=0;i<D.us.length;i++){
-    if(D.us[i].u===oldU){
-      D.us[i].u=newU;D.us[i].p=newP;D.us[i].r=newR;D.us[i].l=rmap[newR]||newR;
-      break;
+// MODAL EDIT USER — attaché après le DOM
+window._initEuModal=function(){
+  var ec=q("eu_cancel"),em=q("eu_modal"),es=q("eu_save");
+  if(ec)ec.addEventListener("click",function(){q("eu_modal").style.display="none";});
+  if(em)em.addEventListener("click",function(e){if(e.target===this)this.style.display="none";});
+  if(es)es.addEventListener("click",function(){
+    var oldU=q("eu_old").value;
+    var newU=q("eu_u").value.trim();
+    var newP=q("eu_p").value;
+    var newR=q("eu_r").value;
+    if(!newU||!newP){ntf("Identifiant et mot de passe requis!","er");return;}
+    var conflict=D.us.some(function(x){return x.u===newU&&x.u!==oldU;});
+    if(conflict){ntf("Cet identifiant est deja utilise!","er");return;}
+    var rmap={creator:"Createur",admin:"Administrateur",tresorier:"Tresorier",membre:"Membre Simple"};
+    for(var i=0;i<D.us.length;i++){
+      if(D.us[i].u===oldU){
+        D.us[i].u=newU;D.us[i].p=newP;D.us[i].r=newR;D.us[i].l=rmap[newR]||newR;
+        break;
+      }
     }
-  }
-  sv();q("eu_modal").style.display="none";rUtbl();
-  if(CU&&CU.u===oldU){CU.u=newU;CU.p=newP;CU.r=newR;q("cusr").textContent=newU;}
-  ntf("Utilisateur modifie avec succes!","ok");
-});
+    sv();q("eu_modal").style.display="none";rUtbl();
+    if(CU&&CU.u===oldU){CU.u=newU;CU.p=newP;CU.r=newR;q("cusr").textContent=newU;}
+    ntf("Utilisateur modifie avec succes!","ok");
+  });
+};
 })();
 
 </script>
@@ -1162,6 +1165,8 @@ q("eu_save").addEventListener("click",function(){
   .then(function(reg){window._swReg=reg;console.log('SW ok');})
   .catch(function(e){console.warn('SW erreur:',e.message);});
 })();
+// Initialiser le modal eu après le DOM
+if(window._initEuModal)window._initEuModal();
 </script>
 </body>
 </html>
