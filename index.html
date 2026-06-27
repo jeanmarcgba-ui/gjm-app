@@ -674,11 +674,43 @@ function goPage(id){
 q("loginbtn").addEventListener("click",doLogin);
 q("lp").addEventListener("keypress",function(e){if(e.key==="Enter")doLogin();});
 function doLogin(){
-  if(chkBlock())return;
-  var u=gv("lu").trim(),p=gv("lp"),f=null;
-  for(var i=0;i<D.us.length;i++){if(D.us[i].u===u&&D.us[i].p===p){f=D.us[i];break;}}
-  if(!f){var e=q("lerr");e.style.display="block";setTimeout(function(){e.style.display="none";},3000);return;}
-  CU=f;startApp();
+  console.log("doLogin: u="+gv("lu")+" D.us="+D.us.length);
+  if(chkBlock()){console.log("chkBlock bloque");return;}
+  var u=gv("lu").trim(),p=gv("lp");
+  var btn=q("loginbtn");
+  if(btn){btn.textContent="Connexion...";btn.disabled=true;}
+
+  function tryLogin(){
+    var f=null;
+    console.log("tryLogin: D.us="+D.us.length+" users:", JSON.stringify(D.us.map(function(x){return x.u;})));
+    for(var i=0;i<D.us.length;i++){
+      if(D.us[i].u===u&&D.us[i].p===p){f=D.us[i];break;}
+    }
+    if(btn){btn.textContent="Se Connecter";btn.disabled=false;}
+    if(!f){
+      console.log("Utilisateur non trouvé");
+      var e=q("lerr");
+      if(e){e.style.display="block";setTimeout(function(){e.style.display="none";},4000);}
+      return;
+    }
+    console.log("OK: "+f.u+" role:"+f.r);
+    CU=f;window.CU=CU;
+    try{localStorage.setItem("gjm_session",JSON.stringify({u:f.u,r:f.r}));}catch(ex){}
+    startApp();
+  }
+
+  // Charger depuis Supabase avant de vérifier
+  if(window.jbLoad){
+    var _t=setTimeout(function(){console.log("timeout Supabase");tryLogin();},6000);
+    window.jbLoad(function(d){
+      clearTimeout(_t);
+      console.log("Supabase OK: us="+((d&&d.us)?d.us.length:"null"));
+      if(d&&(d.us||d.mb)){Object.keys(d).forEach(function(k){D[k]=d[k];});}
+      tryLogin();
+    });
+  } else {
+    tryLogin();
+  }
 }
 q("logoutbtn").addEventListener("click",function(){
   CU=null;q("pg-app").style.display="none";q("pg-login").style.display="flex";
