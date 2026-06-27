@@ -31,7 +31,7 @@ window.jbLoad=function(cb){
     var data=JSON.parse(rows[0].payload);
     if(!data||typeof data!=="object")return;
     _sbLastSig=_jbSig(data);cb(data);
-  }).catch(function(e){console.warn("Supabase:",e.message);});
+  }).catch(function(e){console.warn("Supabase load:",e.message||e);});
 };
 window.jbStartSync=function(){
   _jbSetStatus("&#9203; Sync...","#fff3cd","#856404");
@@ -39,10 +39,16 @@ window.jbStartSync=function(){
     fetch(SB_API+"?id=eq.1&select=payload,updated_at",{headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY}})
     .then(function(r){return r.json();})
     .then(function(rows){
-      if(!rows||!rows.length||!rows[0].payload)return;
+      if(!rows||!rows.length||!rows[0].payload){
+        _jbSetStatus("&#128994; Sync","#d4edda","#155724");
+        return;
+      }
       var data=JSON.parse(rows[0].payload);
       var newSig=_jbSig(data),newTs=rows[0].updated_at||"";
-      if(newSig===_sbLastSig&&newTs===_sbLastTs)return;
+      if(newSig===_sbLastSig&&newTs===_sbLastTs){
+        _jbSetStatus("&#128994; Sync","#d4edda","#155724");
+        return;
+      }
       _sbLastSig=newSig;_sbLastTs=newTs;
       Object.keys(data).forEach(function(k){window.D[k]=data[k];});
       try{localStorage.setItem("gjm4",JSON.stringify(window.D));}catch(e){}
@@ -51,11 +57,9 @@ window.jbStartSync=function(){
       _jbSetStatus("&#128260; Mis a jour","#d4edda","#155724");
       setTimeout(function(){_jbSetStatus("&#128994; Sync","#d4edda","#155724");},2000);
     }).catch(function(e){
-    console.warn("Sync erreur:",e.message||e);
-    _jbSetStatus("&#128260; Actualisation...","#fff3cd","#856404");
-    // Réessayer dans 5s
-    setTimeout(doSync,5000);
-  });
+      console.warn("Sync erreur:",e.message||e);
+      _jbSetStatus("&#128245; Hors ligne","#f8d7da","#721c24");
+    });
   }
   setInterval(doSync,10000);doSync();
   window.forceSync=function(){
