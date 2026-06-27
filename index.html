@@ -4634,6 +4634,8 @@ q("unlbtn").addEventListener("click",function(){
 });
 
 function startApp(){
+  console.log("startApp: début");
+  try{
   q("pg-login").style.display="none";
   q("pg-app").style.display="block";
   q("cusr").textContent=CU.u;
@@ -4671,9 +4673,14 @@ function startApp(){
   if(window.jbStartSync&&!window._jbSyncStarted){
     window._jbSyncStarted=true;
     window.jbStartSync();
-    _jbSetStatus("🟢 Sync","#d4edda","#155724");
+    _jbSetStatus("&#128994; Sync","#d4edda","#155724");
   }
-
+  console.log("startApp: fin OK");
+  }catch(err){
+    console.error("ERREUR startApp:",err.message,err.stack);
+    // Afficher l'erreur à l'utilisateur
+    alert("Erreur ouverture: "+err.message);
+  }
 }
 
 chkBlock();
