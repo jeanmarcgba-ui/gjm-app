@@ -4563,8 +4563,10 @@ function goPage(id){
 q("loginbtn").addEventListener("click",doLogin);
 q("lp").addEventListener("keypress",function(e){if(e.key==="Enter")doLogin();});
 function doLogin(){
-  if(chkBlock())return;
+  console.log("doLogin appelé");
+  if(chkBlock()){console.log("chkBlock bloque");return;}
   var u=gv("lu").trim(),p=gv("lp");
+  console.log("Utilisateur:", u, "D.us:", D.us?D.us.length:"null");
   var btn=q("loginbtn");
   if(btn){btn.textContent="Connexion...";btn.disabled=true;}
 
@@ -4573,30 +4575,41 @@ function doLogin(){
   }
 
   function tryLogin(){
+    console.log("tryLogin - D.us:", D.us?D.us.length:"null");
     var f=null;
     for(var i=0;i<D.us.length;i++){
+      console.log("Check user:", D.us[i].u, "==", u, "pass ok:", D.us[i].p===p);
       if(D.us[i].u===u&&D.us[i].p===p){f=D.us[i];break;}
     }
     resetBtn();
     if(!f){
+      console.log("Utilisateur non trouvé");
       var e=q("lerr");
       if(e){
-        e.innerHTML="Identifiants incorrects. Si vous venez d'etre ajoute, attendez 10 secondes et reessayez.";
+        e.innerHTML="Identifiants incorrects.";
         e.style.display="block";
         setTimeout(function(){e.style.display="none";},6000);
       }
       return;
     }
+    console.log("Utilisateur trouvé:", f.u, "role:", f.r);
     CU=f;window.CU=CU;
     try{localStorage.setItem("gjm_session",JSON.stringify({u:f.u,r:f.r,l:f.l}));}catch(ex){}
+    console.log("Appel startApp...");
     startApp();
+    console.log("startApp terminé");
   }
 
-  // Charger données fraîches depuis Supabase avant connexion
+  // Charger données fraîches depuis Supabase
   if(window.jbLoad){
-    var _t=setTimeout(function(){resetBtn();tryLogin();},6000);
+    console.log("Chargement Supabase...");
+    var _t=setTimeout(function(){
+      console.log("Timeout Supabase - tryLogin local");
+      resetBtn();tryLogin();
+    },6000);
     window.jbLoad(function(d){
       clearTimeout(_t);
+      console.log("Supabase chargé:", d?"OK":"null", "us:", d&&d.us?d.us.length:"?");
       if(d&&(d.us||d.mb)){
         Object.keys(d).forEach(function(k){D[k]=d[k];});
         try{localStorage.setItem("gjm4",JSON.stringify(D));}catch(ex){}
@@ -4604,6 +4617,7 @@ function doLogin(){
       tryLogin();
     });
   } else {
+    console.log("Pas de jbLoad - tryLogin direct");
     tryLogin();
   }
 }
