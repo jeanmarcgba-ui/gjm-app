@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Application GJM</title>
 <script>
-// ── Supabase Sync ─────────────────────────────────────────────
+// -- Supabase Sync ---------------------------------------------
 var SB_URL="https://rbnsymxybhihspknfqdb.supabase.co";
 var SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJibnN5bXh5YmhpaHNwa25mcWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI0NTk4MDQsImV4cCI6MjA5ODAzNTgwNH0.S5Fhnsxhp2-fpThZnCksMoYNyHg-7Kr0FVtGX0ZEdUY";
 var SB_API=SB_URL+"/rest/v1/gjm_data";
@@ -17,9 +17,9 @@ function _sbWrite(data){
   fetch(SB_API,{method:"POST",headers:Object.assign(_sbH(),{"Prefer":"resolution=merge-duplicates"}),
   body:JSON.stringify({id:1,payload:JSON.stringify(data),updated_at:new Date().toISOString()})
   }).then(function(r){
-    if(r.ok||r.status===201||r.status===204){_sbLastSig=_jbSig(data);_jbSetStatus("🟢 Sync","#d4edda","#155724");}
+    if(r.ok||r.status===201||r.status===204){_sbLastSig=_jbSig(data);_jbSetStatus("&#128994; Sync","#d4edda","#155724");}
     else _jbSetStatus("&#9888; Erreur","#fff3cd","#856404");
-  }).catch(function(){_jbSetStatus("📵 Hors ligne","#f8d7da","#721c24");});
+  }).catch(function(){_jbSetStatus("&#128245; Hors ligne","#f8d7da","#721c24");});
 }
 // Badges messages/notifications non lus
 var _lastMsgCount=0,_lastNfCount=0;
@@ -64,19 +64,19 @@ window.jbLoad=function(cb){
   }).catch(function(e){console.warn("Supabase load:",e.message||e);});
 };
 window.jbStartSync=function(){
-  _jbSetStatus("⏳ Sync...","#fff3cd","#856404");
+  _jbSetStatus("&#9203; Sync...","#fff3cd","#856404");
   function doSync(){
     fetch(SB_API+"?id=eq.1&select=payload,updated_at",{headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY}})
     .then(function(r){return r.json();})
     .then(function(rows){
       if(!rows||!rows.length||!rows[0].payload){
-        _jbSetStatus("🟢 Sync","#d4edda","#155724");
+        _jbSetStatus("&#128994; Sync","#d4edda","#155724");
         return;
       }
       var data=JSON.parse(rows[0].payload);
       var newSig=_jbSig(data),newTs=rows[0].updated_at||"";
       if(newSig===_sbLastSig&&newTs===_sbLastTs){
-        _jbSetStatus("🟢 Sync","#d4edda","#155724");
+        _jbSetStatus("&#128994; Sync","#d4edda","#155724");
         return;
       }
       _sbLastSig=newSig;_sbLastTs=newTs;
@@ -88,24 +88,24 @@ window.jbStartSync=function(){
       _updBadges(data);
       // Notifications ciblées
       if(window.rNflst)window.rNflst();
-      _jbSetStatus("🔄 Mis a jour","#d4edda","#155724");
-      setTimeout(function(){_jbSetStatus("🟢 Sync","#d4edda","#155724");},2000);
+      _jbSetStatus("&#128260; Mis a jour","#d4edda","#155724");
+      setTimeout(function(){_jbSetStatus("&#128994; Sync","#d4edda","#155724");},2000);
     }).catch(function(e){
       console.warn("Sync erreur:",e.message||e);
-      _jbSetStatus("📵 Hors ligne","#f8d7da","#721c24");
+      _jbSetStatus("&#128245; Hors ligne","#f8d7da","#721c24");
     });
   }
   setInterval(doSync,10000);doSync();
   window.forceSync=function(){
     _sbLastSig="";_sbLastTs="";
     var btn=document.getElementById("refresh-btn");
-    if(btn)btn.innerHTML="⏳";
+    if(btn)btn.innerHTML="&#9203;";
     window.jbLoad(function(data){
       Object.keys(data).forEach(function(k){window.D[k]=data[k];});
       try{localStorage.setItem("gjm4",JSON.stringify(window.D));}catch(e){}
       ["rMtbl","rKtbl","rNflst","rNews","rDtbl","rCtbl","rMsgs","rGal","rUtbl","rEvlst","rCcont","updUI","updSt","updHomeNf"].forEach(function(fn){if(window[fn])window[fn]();});
       if(window.rShop)window.rShop();if(window.rPayHistory)window.rPayHistory();
-      if(btn)btn.innerHTML="🔄";
+      if(btn)btn.innerHTML="&#128260;";
       if(window.ntf)window.ntf("Application actualisee !","ok");
     });
   };
@@ -806,7 +806,7 @@ q("unlbtn").addEventListener("click",function(){
 });
 
 function startApp(){
-  // Si expiré et pas créateur → page bloquée
+  // Si expiré et pas créateur -> page bloquée
   if(D.exp&&isExp()&&CU&&CU.r!=="creator"){
     q("pg-login").style.display="none";
     q("pg-app").style.display="none";
@@ -1247,7 +1247,7 @@ function updCd(){
 }
 updUI();
 
-// MODAL EDIT USER — attaché après le DOM
+// MODAL EDIT USER - attaché après le DOM
 window._initEuModal=function(){
   var ec=q("eu_cancel"),em=q("eu_modal"),es=q("eu_save");
   if(ec)ec.addEventListener("click",function(){q("eu_modal").style.display="none";});
