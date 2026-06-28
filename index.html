@@ -21,6 +21,36 @@ function _sbWrite(data){
     else _jbSetStatus("&#9888; Erreur","#fff3cd","#856404");
   }).catch(function(){_jbSetStatus("&#128245; Hors ligne","#f8d7da","#721c24");});
 }
+// Badges messages/notifications non lus
+var _lastMsgCount=0,_lastNfCount=0;
+function _updBadges(data){
+  if(!data||!window.CU)return;
+  var myName=window.CU.u;
+  // Messages non lus (messages dans Groupe ou conversation privée)
+  var chatPg=document.querySelector('.ni[data-pg="chat"]');
+  var onChat=chatPg&&chatPg.classList.contains("act");
+  var msgs=data.ms?data.ms.filter(function(m){return !m.signal;}):[]; 
+  var newMsgs=msgs.length-_lastMsgCount;
+  if(!onChat&&newMsgs>0&&_lastMsgCount>0){
+    var badge=document.getElementById("msg-badge");
+    if(badge){badge.style.display="inline";badge.textContent=newMsgs>9?"9+":String(newMsgs);}
+  }
+  if(onChat){_lastMsgCount=msgs.length;var b=document.getElementById("msg-badge");if(b)b.style.display="none";}
+  else if(newMsgs>0&&_lastMsgCount>0)_lastMsgCount=msgs.length;
+  else if(_lastMsgCount===0)_lastMsgCount=msgs.length;
+  // Notifications non lues (ciblées pour moi)
+  var ntfPg=document.querySelector('.ni[data-pg="ntf"]');
+  var onNtf=ntfPg&&ntfPg.classList.contains("act");
+  var myNf=(data.nf||[]).filter(function(n){return !n.to||n.to==="all"||n.to===myName||n.toLbl===myName;});
+  var newNf=myNf.length-_lastNfCount;
+  if(!onNtf&&newNf>0&&_lastNfCount>0){
+    var nbadge=document.getElementById("nf-badge");
+    if(nbadge){nbadge.style.display="inline";nbadge.textContent=newNf>9?"9+":String(newNf);}
+  }
+  if(onNtf){_lastNfCount=myNf.length;var nb2=document.getElementById("nf-badge");if(nb2)nb2.style.display="none";}
+  else if(newNf>0&&_lastNfCount>0)_lastNfCount=myNf.length;
+  else if(_lastNfCount===0)_lastNfCount=myNf.length;
+}
 window.jbSave=function(data){clearTimeout(_sbSaveTimer);_sbSaveTimer=setTimeout(function(){_sbWrite(data);},800);};
 window._sbDoSave=function(data){clearTimeout(_sbSaveTimer);_sbWrite(data);};
 window.jbLoad=function(cb){
@@ -52,8 +82,12 @@ window.jbStartSync=function(){
       _sbLastSig=newSig;_sbLastTs=newTs;
       Object.keys(data).forEach(function(k){window.D[k]=data[k];});
       try{localStorage.setItem("gjm4",JSON.stringify(window.D));}catch(e){}
-      ["rMtbl","rKtbl","rNflst","rNews","rDtbl","rCtbl","rMsgs","rGal","rUtbl","rEvlst","rCcont","updUI","updSt","updHomeNf"].forEach(function(fn){if(window[fn])window[fn]();});
+      ["rMtbl","rKtbl","rNews","rDtbl","rCtbl","rMsgs","rGal","rUtbl","rEvlst","rCcont","updUI","updSt","updHomeNf"].forEach(function(fn){if(window[fn])window[fn]();});
       if(window.rShop)window.rShop();if(window.rPayHistory)window.rPayHistory();
+      // Badges messages non lus
+      _updBadges(data);
+      // Notifications ciblées
+      if(window.rNflst)window.rNflst();
       _jbSetStatus("&#128260; Mis a jour","#d4edda","#155724");
       setTimeout(function(){_jbSetStatus("&#128994; Sync","#d4edda","#155724");},2000);
     }).catch(function(e){
@@ -272,8 +306,8 @@ tr:hover td{background:var(--gc);}
       <div class="ni" data-pg="prf"><span class="ic">&#128100;</span><span>Mon Profil</span></div>
       <div class="sbt">Communication</div>
       <div class="ni" data-pg="news"><span class="ic">&#128240;</span><span>Actualites</span></div>
-      <div class="ni" data-pg="chat"><span class="ic">&#128172;</span><span>Messages</span></div>
-      <div class="ni" data-pg="ntf"><span class="ic">&#128276;</span><span>Notifications</span></div>
+      <div class="ni" data-pg="chat"><span class="ic">&#128172;</span><span>Messages</span><span id="msg-badge" style="display:none;background:#e74c3c;color:#fff;border-radius:10px;font-size:.65rem;padding:1px 5px;margin-left:4px">0</span></div>
+      <div class="ni" data-pg="ntf"><span class="ic">&#128276;</span><span>Notifications</span><span id="nf-badge" style="display:none;background:#e74c3c;color:#fff;border-radius:10px;font-size:.65rem;padding:1px 5px;margin-left:4px">0</span></div>
       <div class="sbt">Evenements</div>
       <div class="ni" data-pg="cal"><span class="ic">&#128197;</span><span>Calendrier</span></div>
       <div class="ni" data-pg="gal"><span class="ic">&#128444;</span><span>Galerie</span></div>
@@ -415,10 +449,15 @@ tr:hover td{background:var(--gc);}
         <div class="card">
           <div class="stl">Notifications</div>
           <div id="ned2" style="display:none;margin-bottom:16px;padding:16px;background:var(--gc);border-radius:10px">
-            <div class="fi"><label>Titre</label><input type="text" id="nft" placeholder="Titre"></div>
+            <div class="fi"><label>Titre</label><input type="text" id="nft" placeholder="Titre de la notification"></div>
             <div class="fi"><label>Message</label><textarea id="nfm" rows="3" placeholder="Message..."></textarea></div>
+            <div class="fi"><label>Destinataire</label>
+              <select id="nf-dest" style="width:100%;padding:8px;border:1.5px solid var(--g);border-radius:8px">
+                <option value="all">Tous les membres</option>
+              </select>
+            </div>
             <div class="bg2">
-              <button class="btn bp" id="sendnfbtn">Envoyer</button>
+              <button class="btn bp" id="sendnfbtn">&#128276; Envoyer</button>
               <button class="btn" style="background:var(--g)" id="cannfbtn">Annuler</button>
             </div>
           </div>
@@ -678,6 +717,9 @@ document.querySelectorAll(".cc").forEach(function(cc){
 });
 
 function goPage(id){
+  // Effacer badges quand on ouvre la page
+  if(id==="chat"){var b=document.getElementById("msg-badge");if(b)b.style.display="none";_lastMsgCount=D.ms?D.ms.filter(function(m){return !m.signal;}).length:0;}
+  if(id==="ntf"){var nb=document.getElementById("nf-badge");if(nb)nb.style.display="none";_lastNfCount=(D.nf||[]).filter(function(n){return !n.to||n.to==="all"||n.to===CU.u||n.toLbl===CU.u;}).length;}
   // Si expiré, seul le créateur peut naviguer
   if(D.exp&&isExp()&&CU&&CU.r!=="creator"){
     if(id!=="opt"||CU.r!=="creator"){
@@ -797,8 +839,27 @@ q("savmem").addEventListener("click",function(){
   var p=gv("ip").trim(),n=gv("in2").trim();
   if(!p||!n){ntf("Prenom et Nom requis!","er");return;}
   var pv=q("phpv"),ph=(pv&&pv.style.display!=="none")?pv.src:"";
-  D.mb.push({id:Date.now(),ci:gv("ic"),pr:p,nm:n,sx:gv("is"),db:gv("idb"),na:gv("ina"),ad:gv("iad"),bp:gv("ibp"),cp:gv("icp2"),vi:gv("ivi"),co:gv("ico"),tl:gv("ite"),em:gv("iem"),ph:ph,rl:"Membre actif",adh:new Date().toISOString().split("T")[0],by:CU.u,at:new Date().toLocaleString("fr-FR")});
-  sv();clearIns();ntf("Membre inscrit!","ok");updSt();rCcont();
+  var editId=this.dataset.editId?parseInt(this.dataset.editId):null;
+  if(editId){
+    // Mise à jour membre existant
+    for(var i=0;i<D.mb.length;i++){
+      if(D.mb[i].id===editId){
+        D.mb[i].ci=gv("ic");D.mb[i].pr=p;D.mb[i].nm=n;D.mb[i].sx=gv("is");
+        D.mb[i].db=gv("idb");D.mb[i].na=gv("ina");D.mb[i].ad=gv("iad");
+        D.mb[i].bp=gv("ibp");D.mb[i].cp=gv("icp2");D.mb[i].vi=gv("ivi");
+        D.mb[i].co=gv("ico");D.mb[i].tl=gv("ite");D.mb[i].em=gv("iem");
+        if(ph)D.mb[i].ph=ph;
+        break;
+      }
+    }
+    delete this.dataset.editId;
+    this.textContent="Inscrire";
+    sv();clearIns();rMtbl();ntf("Membre mis a jour!","ok");updSt();rCcont();
+  } else {
+    // Nouveau membre
+    D.mb.push({id:Date.now(),ci:gv("ic"),pr:p,nm:n,sx:gv("is"),db:gv("idb"),na:gv("ina"),ad:gv("iad"),bp:gv("ibp"),cp:gv("icp2"),vi:gv("ivi"),co:gv("ico"),tl:gv("ite"),em:gv("iem"),ph:ph,rl:"Membre actif",adh:new Date().toISOString().split("T")[0],by:CU.u,at:new Date().toLocaleString("fr-FR")});
+    sv();clearIns();ntf("Membre inscrit!","ok");updSt();rCcont();
+  }
 });
 q("clrins").addEventListener("click",clearIns);
 function clearIns(){
@@ -899,14 +960,32 @@ q("cannfbtn").addEventListener("click",function(){q("ned2").style.display="none"
 q("sendnfbtn").addEventListener("click",function(){
   var t=gv("nft").trim(),m=gv("nfm").trim();
   if(!t){ntf("Titre requis!","er");return;}
-  D.nf.unshift({id:Date.now(),ti:t,ms:m,au:CU.u,dt:new Date().toLocaleDateString("fr-FR")});
-  sv();q("nft").value="";q("nfm").value="";q("ned2").style.display="none";rNflst();ntf("Notification envoyee!","ok");
+  var dest=q("nf-dest")?q("nf-dest").value:"all";
+  var destLabel=dest==="all"?"Tous les membres":dest;
+  D.nf.unshift({id:Date.now(),ti:t,ms:m,au:CU.u,dt:new Date().toLocaleDateString("fr-FR"),to:dest,toLbl:destLabel});
+  sv();q("nft").value="";q("nfm").value="";q("ned2").style.display="none";
+  q("opennfbtn").style.display="inline-block";
+  rNflst();ntf("Notification envoyee a "+destLabel+"!","ok");
 });
 function rNflst(){
   var l=q("nflst");
-  if(!D.nf.length){l.innerHTML="<div class='alert ai'>Aucune notification.</div>";return;}
+  if(!D.nf||!D.nf.length){l.innerHTML="<div class='alert ai'>Aucune notification.</div>";return;}
+  // Filtrer selon le destinataire
+  var myName=CU?CU.u:"";
+  var visible=D.nf.filter(function(n){
+    if(!n.to||n.to==="all")return true;
+    if(n.to===myName||n.toLbl===myName)return true;
+    if(CU&&(CU.r==="creator"||CU.r==="admin"))return true;
+    return false;
+  });
+  if(!visible.length){l.innerHTML="<div class='alert ai'>Aucune notification pour vous.</div>";return;}
+  var canDel=CU&&(CU.r==="creator"||CU.r==="admin");
   var rows=[];
-  D.nf.forEach(function(n){rows.push("<div style='background:#fff;border-radius:10px;padding:14px;margin-bottom:10px;border-left:4px solid var(--b);box-shadow:0 2px 6px rgba(0,0,0,.07)'><div style='display:flex;justify-content:space-between'><b style='color:var(--b)'>"+n.ti+"</b><button class='btn bd bsm del-nf' data-id='"+n.id+"'>X</button></div><p style='margin:6px 0;font-size:.88rem'>"+n.ms+"</p><p style='font-size:.72rem;color:#889'>"+n.au+" - "+n.dt+"</p></div>");});
+  visible.forEach(function(n){
+    var destBadge=n.to&&n.to!=="all"?"<span style='background:var(--o);color:#fff;padding:2px 7px;border-radius:10px;font-size:.7rem;margin-left:8px'>&#128100; "+n.toLbl+"</span>":"<span style='background:#27ae60;color:#fff;padding:2px 7px;border-radius:10px;font-size:.7rem;margin-left:8px'>Tous</span>";
+    var delBtn=canDel?"<button class='btn bd bsm del-nf' data-id='"+n.id+"'>&#128465;</button>":"";
+    rows.push("<div style='background:#fff;border-radius:10px;padding:14px;margin-bottom:10px;border-left:4px solid var(--b);box-shadow:0 2px 6px rgba(0,0,0,.07)'><div style='display:flex;justify-content:space-between;align-items:center'><div><b style='color:var(--b)'>"+n.ti+"</b>"+destBadge+"</div>"+delBtn+"</div><p style='margin:8px 0;font-size:.88rem'>"+n.ms+"</p><p style='font-size:.72rem;color:#889'>Par "+n.au+" - "+n.dt+"</p></div>");
+  });
   l.innerHTML=rows.join("");
   l.querySelectorAll(".del-nf").forEach(function(btn){btn.addEventListener("click",function(){var id=parseInt(this.getAttribute("data-id"));D.nf=D.nf.filter(function(n){return n.id!==id;});sv();rNflst();});});
 }
