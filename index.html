@@ -17,9 +17,9 @@ function _sbWrite(data){
   fetch(SB_API,{method:"POST",headers:Object.assign(_sbH(),{"Prefer":"resolution=merge-duplicates"}),
   body:JSON.stringify({id:1,payload:JSON.stringify(data),updated_at:new Date().toISOString()})
   }).then(function(r){
-    if(r.ok||r.status===201||r.status===204){_sbLastSig=_jbSig(data);_jbSetStatus("&#128994; Sync","#d4edda","#155724");}
+    if(r.ok||r.status===201||r.status===204){_sbLastSig=_jbSig(data);_jbSetStatus("🟢 Sync","#d4edda","#155724");}
     else _jbSetStatus("&#9888; Erreur","#fff3cd","#856404");
-  }).catch(function(){_jbSetStatus("&#128245; Hors ligne","#f8d7da","#721c24");});
+  }).catch(function(){_jbSetStatus("📵 Hors ligne","#f8d7da","#721c24");});
 }
 // Badges messages/notifications non lus
 var _lastMsgCount=0,_lastNfCount=0;
@@ -64,19 +64,19 @@ window.jbLoad=function(cb){
   }).catch(function(e){console.warn("Supabase load:",e.message||e);});
 };
 window.jbStartSync=function(){
-  _jbSetStatus("&#9203; Sync...","#fff3cd","#856404");
+  _jbSetStatus("⏳ Sync...","#fff3cd","#856404");
   function doSync(){
     fetch(SB_API+"?id=eq.1&select=payload,updated_at",{headers:{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY}})
     .then(function(r){return r.json();})
     .then(function(rows){
       if(!rows||!rows.length||!rows[0].payload){
-        _jbSetStatus("&#128994; Sync","#d4edda","#155724");
+        _jbSetStatus("🟢 Sync","#d4edda","#155724");
         return;
       }
       var data=JSON.parse(rows[0].payload);
       var newSig=_jbSig(data),newTs=rows[0].updated_at||"";
       if(newSig===_sbLastSig&&newTs===_sbLastTs){
-        _jbSetStatus("&#128994; Sync","#d4edda","#155724");
+        _jbSetStatus("🟢 Sync","#d4edda","#155724");
         return;
       }
       _sbLastSig=newSig;_sbLastTs=newTs;
@@ -88,24 +88,24 @@ window.jbStartSync=function(){
       _updBadges(data);
       // Notifications ciblées
       if(window.rNflst)window.rNflst();
-      _jbSetStatus("&#128260; Mis a jour","#d4edda","#155724");
-      setTimeout(function(){_jbSetStatus("&#128994; Sync","#d4edda","#155724");},2000);
+      _jbSetStatus("🔄 Mis a jour","#d4edda","#155724");
+      setTimeout(function(){_jbSetStatus("🟢 Sync","#d4edda","#155724");},2000);
     }).catch(function(e){
       console.warn("Sync erreur:",e.message||e);
-      _jbSetStatus("&#128245; Hors ligne","#f8d7da","#721c24");
+      _jbSetStatus("📵 Hors ligne","#f8d7da","#721c24");
     });
   }
   setInterval(doSync,10000);doSync();
   window.forceSync=function(){
     _sbLastSig="";_sbLastTs="";
     var btn=document.getElementById("refresh-btn");
-    if(btn)btn.innerHTML="&#9203;";
+    if(btn)btn.innerHTML="⏳";
     window.jbLoad(function(data){
       Object.keys(data).forEach(function(k){window.D[k]=data[k];});
       try{localStorage.setItem("gjm4",JSON.stringify(window.D));}catch(e){}
       ["rMtbl","rKtbl","rNflst","rNews","rDtbl","rCtbl","rMsgs","rGal","rUtbl","rEvlst","rCcont","updUI","updSt","updHomeNf"].forEach(function(fn){if(window[fn])window[fn]();});
       if(window.rShop)window.rShop();if(window.rPayHistory)window.rPayHistory();
-      if(btn)btn.innerHTML="&#128260;";
+      if(btn)btn.innerHTML="🔄";
       if(window.ntf)window.ntf("Application actualisee !","ok");
     });
   };
@@ -256,6 +256,16 @@ tr:hover td{background:var(--gc);}
   .hdr{position:sticky;top:0;z-index:100;}
   .pg{padding:0!important;}
 }
+
+/* MOBILE OVERRIDE */
+@media screen and (max-width:768px){
+  #pg-app{display:flex!important;flex-direction:column!important;width:100%!important;overflow-x:hidden!important;}
+  .sb{width:100%!important;min-width:0!important;max-width:100%!important;flex-direction:row!important;display:flex!important;flex-wrap:nowrap!important;overflow-x:auto!important;height:auto!important;min-height:0!important;border-right:none!important;border-top:1px solid #e8ecf3!important;order:9!important;padding:4px 0!important;}
+  .mc{width:100%!important;min-width:0!important;max-width:100%!important;flex:1!important;order:1!important;padding:8px!important;overflow-y:auto!important;}
+  .sbt{display:none!important;}
+  .ni{flex-direction:column!important;padding:6px 10px!important;font-size:.6rem!important;min-width:56px!important;white-space:nowrap!important;border-left:none!important;border-bottom:3px solid transparent!important;}
+  .ni.act{border-bottom-color:var(--b)!important;border-left:none!important;}
+}
 </style>
 </head>
 <body>
@@ -292,8 +302,8 @@ tr:hover td{background:var(--gc);}
       <div class="bt"><h2 id="hname">Association GJM</h2><span>Systeme de Gestion</span></div>
     </div>
     <div class="hr">
-      <span id="fb-status" style="font-size:.7rem;padding:2px 8px;border-radius:10px;background:#e0e0e0;color:#888">&#128260;</span>
-      <button onclick="if(window.forceSync)window.forceSync()" id="refresh-btn" title="Actualiser" style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.15);color:#fff;border:none;cursor:pointer;font-size:1rem">&#128260;</button>
+      <span id="fb-status" style="font-size:.7rem;padding:2px 8px;border-radius:10px;background:#e0e0e0;color:#888">🔄</span>
+      <button onclick="if(window.forceSync)window.forceSync()" id="refresh-btn" title="Actualiser" style="width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.15);color:#fff;border:none;cursor:pointer;font-size:1rem">🔄</button>
       <div class="ubadge"><div class="dot"></div><span id="cusr">-</span></div>
       <button class="blg" id="logoutbtn">Deconnexion</button>
     </div>
@@ -904,7 +914,8 @@ function shFiche(id){
 }
 q("prtbtn").addEventListener("click",function(){
   var w=window.open("","_blank");
-  w.document.write("<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Fiche</title><style>body{font-family:Arial;padding:30px;color:#1a2540}label{font-size:.72rem;color:#889}p{font-weight:600;margin:2px 0 10px}</style></head><body>"+q("fiche-body").innerHTML+"<"+"script>window.print();<"+"/script></body></html>");
+  w.document.write("<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Fiche</title><style>body{font-family:Arial;padding:30px;color:#1a2540}label{font-size:.72rem;color:#889}p{font-weight:600;margin:2px 0 10px}
+</head><body>"+q("fiche-body").innerHTML+"<"+"script>window.print();<"+"/script></body></html>");
   w.document.close();
 });
 q("clrfiche").addEventListener("click",function(){q("fiche-wrap").style.display="none";});
