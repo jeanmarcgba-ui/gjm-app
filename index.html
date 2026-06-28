@@ -240,8 +240,10 @@ tr:hover td{background:var(--gc);}
 .fl{font-size:.78rem;color:#889;margin-top:4px;}
 @media(max-width:768px){
   body{overflow-x:hidden;}
-  .sb{width:100%!important;display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;overflow-x:auto!important;height:auto!important;padding:4px!important;-webkit-overflow-scrolling:touch;}
-  .mc{padding:8px 6px!important;width:100%!important;box-sizing:border-box!important;}
+  #pg-app{flex-direction:column!important;}
+  .sb{width:100%!important;display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;overflow-x:auto!important;height:auto!important;padding:4px!important;-webkit-overflow-scrolling:touch;order:2;border-right:none!important;border-top:1px solid var(--g);}
+  .mc{padding:8px 6px!important;width:100%!important;box-sizing:border-box!important;order:1;flex:1;}
+  .sbt{display:none!important;}
   .ni{flex-direction:column!important;gap:2px!important;padding:6px 8px!important;font-size:.58rem!important;min-width:52px!important;border-left:none!important;border-bottom:3px solid transparent!important;white-space:nowrap!important;}
   .ni.act{border-left:none!important;border-bottom-color:var(--b)!important;}
   .fg2{grid-template-columns:1fr!important;}
@@ -282,7 +284,7 @@ tr:hover td{background:var(--gc);}
   </div>
 </div>
 
-<div id="pg-app">
+<div id="pg-app" style="display:flex;min-height:100vh;flex-direction:row">
   <div class="cbar" id="cbar"></div>
   <div class="hdr">
     <div class="brand">
@@ -803,7 +805,7 @@ function startApp(){
     return;
   }
   q("pg-login").style.display="none";
-  q("pg-app").style.display="block";
+  q("pg-app").style.display="flex";
   q("cusr").textContent=CU.u;
   var adm=CU.r==="creator"||CU.r==="admin";
   var tre=CU.r==="tresorier";
