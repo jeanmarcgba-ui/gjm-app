@@ -261,8 +261,18 @@ tr:hover td{background:var(--gc);}
   .sb.open{transform:translateX(0);}
   #sb-overlay.show{display:block!important;}
   .mc{width:100%!important;max-width:100vw!important;padding:10px 8px!important;box-sizing:border-box!important;min-height:60vh!important;flex:1 1 auto!important;display:block!important;}
-  table{font-size:.75rem;display:block;overflow-x:auto;}
+  table{font-size:.8rem;width:100%;}
+  thead{display:none;}
+  table,tbody,tr,td{display:block;width:100%;}
+  tr{margin-bottom:12px;border:1px solid #e8ecf3;border-radius:10px;overflow:hidden;background:#fff;}
+  td{padding:8px 12px;border:none!important;border-bottom:1px solid #f0f2f7!important;text-align:left!important;word-break:break-word;}
+  td:last-child{border-bottom:none!important;}
+  td:empty{display:none;}
   input,select,textarea{font-size:16px!important;}
+}
+
+@media(max-width:768px){
+  td[data-label]::before{content:attr(data-label);display:block;font-size:.65rem;font-weight:700;color:#9aabcc;text-transform:uppercase;margin-bottom:2px;}
 }
 </style>
 </head>
@@ -891,7 +901,7 @@ function rMtbl(){
   fm.forEach(function(m){
     var ph=m.ph?"<img src='"+m.ph+"' style='width:36px;height:36px;border-radius:50%;object-fit:cover'>"
       :"<div style='width:36px;height:36px;border-radius:50%;background:var(--b);color:#fff;display:flex;align-items:center;justify-content:center'>"+(m.pr[0]||"")+(m.nm[0]||"")+"</div>";
-    rows.push("<tr><td>"+ph+"</td><td><b>"+(m.ci||"")+" "+m.pr+" "+m.nm+"</b></td><td>"+m.tl+"</td><td>"+m.em+"</td><td><span class='badge bga'>"+m.rl+"</span></td><td>"+m.adh+"</td><td><button class='btn bp bsm fiche-btn' data-id='"+m.id+"'>Resume</button> <button class='btn bd bsm del-btn' data-id='"+m.id+"'>X</button></td></tr>");
+    rows.push("<tr><td data-label='Photo'>"+ph+"</td><td data-label='Nom'><b>"+(m.ci||"")+" "+m.pr+" "+m.nm+"</b></td><td data-label='Telephone'>"+m.tl+"</td><td data-label='Email'>"+m.em+"</td><td data-label='Statut'><span class='badge bga'>"+m.rl+"</span></td><td data-label='Adhesion'>"+m.adh+"</td><td data-label=''><button class='btn bp bsm fiche-btn' data-id='"+m.id+"'>Resume</button> <button class='btn bd bsm del-btn' data-id='"+m.id+"'>X</button></td></tr>");
   });
   tb.innerHTML=rows.join("");
   tb.querySelectorAll(".fiche-btn").forEach(function(btn){btn.addEventListener("click",function(){shFiche(parseInt(this.getAttribute("data-id")));});});
@@ -1079,7 +1089,7 @@ function rCtbl(){
   var tb=q("ctbl");
   if(!D.ct.length){tb.innerHTML="<tr><td colspan='6' style='text-align:center;padding:20px;color:#889'>Aucune cotisation</td></tr>";return;}
   var rows=[];
-  D.ct.forEach(function(c){rows.push("<tr><td>"+c.mn+"</td><td>"+c.tp+"</td><td style='color:var(--ok);font-weight:700'>"+c.am.toLocaleString("fr-FR")+" FCFA</td><td>"+c.my+"</td><td>"+c.dt+"</td><td><button class='btn bo bsm prt-btn' data-id='"+c.id+"'>Recu</button></td></tr>");});
+  D.ct.forEach(function(c){rows.push("<tr><td data-label='Membre'>"+c.mn+"</td><td data-label='Type'>"+c.tp+"</td><td data-label='Montant' style='color:var(--ok);font-weight:700'>"+c.am.toLocaleString("fr-FR")+" FCFA</td><td data-label='Mois'>"+c.my+"</td><td data-label='Date'>"+c.dt+"</td><td data-label=''><button class='btn bo bsm prt-btn' data-id='"+c.id+"'>Recu</button></td></tr>");});
   tb.innerHTML=rows.join("");
   tb.querySelectorAll(".prt-btn").forEach(function(btn){btn.addEventListener("click",function(){prtR(parseInt(this.getAttribute("data-id")));});});
 }
@@ -1102,7 +1112,7 @@ function rDtbl(){
   var tb=q("dtbl");
   if(!D.dn.length){tb.innerHTML="<tr><td colspan='4' style='text-align:center;padding:20px;color:#889'>Aucun don</td></tr>";return;}
   var rows=[];
-  D.dn.forEach(function(d){rows.push("<tr><td>"+d.nm+"</td><td style='color:var(--ok);font-weight:700'>"+d.am.toLocaleString("fr-FR")+" FCFA</td><td>"+(d.pj||"-")+"</td><td>"+d.dt+"</td></tr>");});
+  D.dn.forEach(function(d){rows.push("<tr><td data-label='Donateur'>"+d.nm+"</td><td data-label='Montant' style='color:var(--ok);font-weight:700'>"+d.am.toLocaleString("fr-FR")+" FCFA</td><td data-label='Note'>"+(d.pj||"-")+"</td><td data-label='Date'>"+d.dt+"</td></tr>");});
   tb.innerHTML=rows.join("");
 }
 
@@ -1118,7 +1128,7 @@ q("addcptbtn").addEventListener("click",function(){
 function rKtbl(){
   var b=0,ti=0,td=0,tb=q("ktbl"),rows=[];
   if(!D.kp.length){tb.innerHTML="<tr><td colspan='5' style='text-align:center;padding:20px;color:#889'>Aucune operation</td></tr>";kb=0;return;}
-  D.kp.forEach(function(e){b+=e.sg*e.am;if(e.sg>0)ti+=e.am;else td+=e.am;var col=e.sg>0?"var(--ok)":"var(--er)";rows.push("<tr><td>"+e.dt+"</td><td><span class='badge "+(e.sg>0?"bga":"bgi")+"'>"+e.tp+"</span></td><td>"+e.lb+"</td><td style='color:"+col+";font-weight:700'>"+(e.sg>0?"+":"-")+e.am.toLocaleString("fr-FR")+" FCFA</td><td style='font-weight:700;color:"+(b>=0?"var(--b)":"var(--er)")+"'>"+b.toLocaleString("fr-FR")+" FCFA</td></tr>");});
+  D.kp.forEach(function(e){b+=e.sg*e.am;if(e.sg>0)ti+=e.am;else td+=e.am;var col=e.sg>0?"var(--ok)":"var(--er)";rows.push("<tr><td data-label='Date'>"+e.dt+"</td><td data-label='Type'><span class='badge "+(e.sg>0?"bga":"bgi")+"'>"+e.tp+"</span></td><td data-label='Libelle'>"+e.lb+"</td><td data-label='Montant' style='color:"+col+";font-weight:700'>"+(e.sg>0?"+":"-")+e.am.toLocaleString("fr-FR")+" FCFA</td><td data-label='Solde' style='font-weight:700;color:"+(b>=0?"var(--b)":"var(--er)")+"'>"+b.toLocaleString("fr-FR")+" FCFA</td></tr>");});
   tb.innerHTML=rows.join("");
   q("trec").textContent=ti.toLocaleString("fr-FR")+" FCFA";
   q("tdep").textContent=td.toLocaleString("fr-FR")+" FCFA";
@@ -1155,7 +1165,7 @@ function rUtbl(){
   var rmap={creator:"Createur",admin:"Administrateur",tresorier:"Tresorier",membre:"Membre Simple"};
   D.us.forEach(function(u){
     u.l=rmap[u.r]||u.r;
-    rows.push("<tr><td><b class='edit-usr-btn' data-u='"+u.u+"' style='cursor:pointer;color:var(--b);text-decoration:underline'>"+u.u+"</b></td><td><span class='badge bga'>"+u.l+"</span></td><td>"+(u.r!=="creator"?"<button class='btn bd bsm del-usr' data-u='"+u.u+"'>Suppr</button>":"<span style='color:#889;font-size:.8rem'>Protege</span>")+"</td></tr>");
+    rows.push("<tr><td data-label='Identifiant'><b class='edit-usr-btn' data-u='"+u.u+"' style='cursor:pointer;color:var(--b);text-decoration:underline'>"+u.u+"</b></td><td data-label='Role'><span class='badge bga'>"+u.l+"</span></td><td data-label=''>"+(u.r!=="creator"?"<button class='btn bd bsm del-usr' data-u='"+u.u+"'>Suppr</button>":"<span style='color:#889;font-size:.8rem'>Protege</span>")+"</td></tr>");
   });
   tb.innerHTML=rows.join("");
   tb.querySelectorAll(".del-usr").forEach(function(btn){
