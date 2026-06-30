@@ -26,7 +26,7 @@ var _lastMsgCount=0,_lastNfCount=0;
 function _updBadges(data){
   if(!data||!window.CU)return;
   var myName=window.CU.u;
-  // Messages non lus (messages dans Groupe ou conversation privée)
+  // Messages non lus (messages dans Groupe ou conversation privee)
   var chatPg=document.querySelector('.ni[data-pg="chat"]');
   var onChat=chatPg&&chatPg.classList.contains("act");
   var msgs=data.ms?data.ms.filter(function(m){return !m.signal;}):[]; 
@@ -38,7 +38,7 @@ function _updBadges(data){
   if(onChat){_lastMsgCount=msgs.length;var b=document.getElementById("msg-badge");if(b)b.style.display="none";}
   else if(newMsgs>0&&_lastMsgCount>0)_lastMsgCount=msgs.length;
   else if(_lastMsgCount===0)_lastMsgCount=msgs.length;
-  // Notifications non lues (ciblées pour moi)
+  // Notifications non lues (ciblees pour moi)
   var ntfPg=document.querySelector('.ni[data-pg="ntf"]');
   var onNtf=ntfPg&&ntfPg.classList.contains("act");
   var myNf=(data.nf||[]).filter(function(n){return !n.to||n.to==="all"||n.to===myName||n.toLbl===myName;});
@@ -86,7 +86,7 @@ window.jbStartSync=function(){
       if(window.rShop)window.rShop();if(window.rPayHistory)window.rPayHistory();
       // Badges messages non lus
       _updBadges(data);
-      // Notifications ciblées
+      // Notifications ciblees
       if(window.rNflst)window.rNflst();
       _jbSetStatus("&#128260; Mis a jour","#d4edda","#155724");
       setTimeout(function(){_jbSetStatus("&#128994; Sync","#d4edda","#155724");},2000);
@@ -673,7 +673,7 @@ tr:hover td{background:var(--gc);}
 (function(){
 var D={an:"Association GJM",exp:null,sd:null,mb:[],ct:[],dn:[],kp:[],nw:[],ev:[],dc:[],us:[{u:"Jean Marc",p:"jeanmarcamp",r:"creator",l:"Createur"}],cts:[],py:{or:"",mo:"",mt:"",wa:""},nf:[],ms:[]};
 function sv(force){
-  // Si expiré et pas créateur : bloquer sauf si force=true
+  // Si expire et pas createur : bloquer sauf si force=true
   if(!force&&D.exp&&isExp()&&CU&&CU.r!=="creator"){
     ntf("Application expiree. Contactez le createur pour renouveler.","er");
     return false;
@@ -699,10 +699,10 @@ var CU=null,cy=new Date().getFullYear(),cm=new Date().getMonth(),curC="Groupe";
 
 function isExp(){if(!D.exp)return false;return new Date()>new Date(D.exp);}
 function chkBlock(){
-  // Bloquer seulement si expiré ET pas créateur/admin
+  // Bloquer seulement si expire ET pas createur/admin
   if(!D.exp||!isExp())return false;
   if(CU&&(CU.r==="creator"||CU.r==="admin"))return false;
-  return true; // Membres simples bloqués si expiré
+  return true; // Membres simples bloques si expire
 }
 
 function q(id){return document.getElementById(id);}
@@ -732,7 +732,7 @@ function goPage(id){
   // Effacer badges quand on ouvre la page
   if(id==="chat"){var b=document.getElementById("msg-badge");if(b)b.style.display="none";_lastMsgCount=D.ms?D.ms.filter(function(m){return !m.signal;}).length:0;}
   if(id==="ntf"){var nb=document.getElementById("nf-badge");if(nb)nb.style.display="none";_lastNfCount=(D.nf||[]).filter(function(n){return !n.to||n.to==="all"||n.to===CU.u||n.toLbl===CU.u;}).length;}
-  // Si expiré, seul le créateur peut naviguer
+  // Si expire, seul le createur peut naviguer
   if(D.exp&&isExp()&&CU&&CU.r!=="creator"){
     if(id!=="opt"||CU.r!=="creator"){
       ntf("Application expiree. Contactez le createur pour renouveler.","er");
@@ -771,7 +771,7 @@ function doLogin(){
     }
     if(btn){btn.textContent="Se Connecter";btn.disabled=false;}
     if(!f){
-      console.log("Utilisateur non trouvé");
+      console.log("Utilisateur non trouve");
       var e=q("lerr");
       if(e){e.style.display="block";setTimeout(function(){e.style.display="none";},4000);}
       return;
@@ -782,7 +782,7 @@ function doLogin(){
     startApp();
   }
 
-  // Charger depuis Supabase avant de vérifier
+  // Charger depuis Supabase avant de verifier
   if(window.jbLoad){
     var _t=setTimeout(function(){console.log("timeout Supabase");tryLogin();},6000);
     window.jbLoad(function(d){
@@ -806,7 +806,7 @@ q("unlbtn").addEventListener("click",function(){
 });
 
 function startApp(){
-  // Si expiré et pas créateur -> page bloquée
+  // Si expire et pas createur -> page bloquee
   if(D.exp&&isExp()&&CU&&CU.r!=="creator"){
     q("pg-login").style.display="none";
     q("pg-app").style.display="none";
@@ -827,7 +827,7 @@ function startApp(){
   setInterval(updCd,60000);
   ntf("Bienvenue "+CU.u+"!","ok");
   if(window.jbStartSync&&!window._jbSyncStarted){window._jbSyncStarted=true;window.jbStartSync();}
-  // Menus selon rôle
+  // Menus selon role
   var _adm=CU.r==="creator"||CU.r==="admin";
   var _mgr=_adm||CU.r==="tresorier";
   var _els={"acc":_adm,"usr":_adm,"ins":_mgr};
@@ -853,7 +853,7 @@ q("savmem").addEventListener("click",function(){
   var pv=q("phpv"),ph=(pv&&pv.style.display!=="none")?pv.src:"";
   var editId=this.dataset.editId?parseInt(this.dataset.editId):null;
   if(editId){
-    // Mise à jour membre existant
+    // Mise a jour membre existant
     for(var i=0;i<D.mb.length;i++){
       if(D.mb[i].id===editId){
         D.mb[i].ci=gv("ic");D.mb[i].pr=p;D.mb[i].nm=n;D.mb[i].sx=gv("is");
@@ -1247,7 +1247,7 @@ function updCd(){
 }
 updUI();
 
-// MODAL EDIT USER - attaché après le DOM
+// MODAL EDIT USER - attache apres le DOM
 window._initEuModal=function(){
   var ec=q("eu_cancel"),em=q("eu_modal"),es=q("eu_save");
   if(ec)ec.addEventListener("click",function(){q("eu_modal").style.display="none";});
@@ -1304,7 +1304,7 @@ window._initEuModal=function(){
   .then(function(reg){window._swReg=reg;console.log('SW ok');})
   .catch(function(e){console.warn('SW erreur:',e.message);});
 })();
-// Initialiser le modal eu après le DOM
+// Initialiser le modal eu apres le DOM
 if(window._initEuModal)window._initEuModal();
 </script>
 </body>
