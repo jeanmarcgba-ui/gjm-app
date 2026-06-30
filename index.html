@@ -914,8 +914,8 @@ function shFiche(id){
 }
 q("prtbtn").addEventListener("click",function(){
   var w=window.open("","_blank");
-  w.document.write("<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Fiche</title><style>body{font-family:Arial;padding:30px;color:#1a2540}label{font-size:.72rem;color:#889}p{font-weight:600;margin:2px 0 10px}
-</head><body>"+q("fiche-body").innerHTML+"<"+"script>window.print();<"+"/script></body></html>");
+  var printHTML="<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Fiche</title><style>body{font-family:Arial;padding:30px;color:#1a2540}label{font-size:.72rem;color:#889}p{font-weight:600;margin:2px 0 10px}</style></head><body>"+q("fiche-body").innerHTML+"</body></html>";
+  w.document.write(printHTML);
   w.document.close();
 });
 q("clrfiche").addEventListener("click",function(){q("fiche-wrap").style.display="none";});
