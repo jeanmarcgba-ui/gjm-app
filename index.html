@@ -12,7 +12,7 @@ var SB_API=SB_URL+"/rest/v1/gjm_data";
 var _sbLastSig="",_sbLastTs="",_sbSaveTimer=null;
 function _sbH(){return{"apikey":SB_KEY,"Authorization":"Bearer "+SB_KEY,"Content-Type":"application/json"};}
 function _jbSig(d){try{var ms=0;if(d.ms)d.ms.forEach(function(m){if(!m.signal)ms++;});return(d.mb?d.mb.length:0)+"_"+(d.us?d.us.length:0)+"_"+(d.ct?d.ct.length:0)+"_"+(d.kp?d.kp.length:0)+"_"+(d.dn?d.dn.length:0)+"_"+(d.nw?d.nw.length:0)+"_"+ms+"_"+(d.nf?d.nf.length:0)+"_"+(d.an||"");}catch(e){return "";}}
-function _jbSetStatus(t,b,c){var s=document.getElementById("fb-status");if(s){s.textContent=t;s.style.background=b;s.style.color=c;}}
+function _jbSetStatus(t,b,c){var s=document.getElementById("fb-status");if(s){s.innerHTML=t;s.style.background=b;s.style.color=c;}}
 function _sbWrite(data){
   fetch(SB_API,{method:"POST",headers:Object.assign(_sbH(),{"Prefer":"resolution=merge-duplicates"}),
   body:JSON.stringify({id:1,payload:JSON.stringify(data),updated_at:new Date().toISOString()})
@@ -114,6 +114,7 @@ window.jbStartSync=function(){
 <style>
 :root{--b:#1a3a6e;--b2:#2255a4;--o:#c8a940;--g:#e8ecf3;--gc:#f5f7fa;--ok:#27ae60;--er:#e74c3c;--wa:#f39c12;}
 *{box-sizing:border-box;margin:0;padding:0;font-family:"Segoe UI",Arial,sans-serif;}
+html,body{overflow-x:hidden;max-width:100vw;}
 body{background:var(--gc);color:#1a2540;min-height:100vh;}
 /* LOGIN */
 #pg-login{display:flex;align-items:center;justify-content:center;min-height:100vh;background:linear-gradient(135deg,#0d2044,#1a3a6e 45%,#2255a4 70%,#c8a940);position:relative;overflow:hidden;}
