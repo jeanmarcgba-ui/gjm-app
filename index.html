@@ -252,7 +252,7 @@ tr:hover td{background:var(--gc);}
 
 @media(max-width:768px){
   html,body{overflow-x:hidden;width:100%;max-width:100vw;}
-  #pg-app.show{display:flex!important;width:100%!important;max-width:100vw!important;}
+  #pg-app.show{display:flex!important;flex-direction:column!important;width:100%!important;max-width:100vw!important;min-height:100vh!important;}
   #hamburger-btn{display:flex!important;align-items:center;justify-content:center;flex-shrink:0;}
   .hdr{flex-wrap:nowrap!important;padding:8px 10px!important;}
   .bt h2{font-size:1rem!important;}
@@ -260,7 +260,7 @@ tr:hover td{background:var(--gc);}
   .sb{position:fixed!important;top:0;left:0;height:100vh!important;width:260px!important;max-width:80vw!important;z-index:999!important;transform:translateX(-100%);transition:transform .25s ease;flex-direction:column!important;overflow-y:auto!important;box-shadow:2px 0 12px rgba(0,0,0,.2);}
   .sb.open{transform:translateX(0);}
   #sb-overlay.show{display:block!important;}
-  .mc{width:100%!important;max-width:100vw!important;padding:10px 8px!important;box-sizing:border-box!important;}
+  .mc{width:100%!important;max-width:100vw!important;padding:10px 8px!important;box-sizing:border-box!important;min-height:60vh!important;flex:1 1 auto!important;display:block!important;}
   table{font-size:.75rem;display:block;overflow-x:auto;}
   input,select,textarea{font-size:16px!important;}
 }
